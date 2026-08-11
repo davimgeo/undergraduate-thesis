@@ -23,7 +23,7 @@ SpecsContext* Specs_Init(SpecsContext* specs)
       .rec_depth = 8,
 
       .offset_rec = 5,
-      .offset_src = 30
+      .offset_src = 100
     },
 
     .model =

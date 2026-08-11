@@ -4,7 +4,7 @@
 #include "utils.h"
 #include "1D/ricker.h"
 
-float l1_norm(float* A, float* B, int size)
+float l1_norm_1d(float* A, float* B, int size)
 {
   float result = 0.0f;
   for (int i = 0; i < size; i++) 
@@ -15,7 +15,22 @@ float l1_norm(float* A, float* B, int size)
   return result;
 }
 
-float l2_norm(float* A, float* B, int size)
+float l1_norm_2d(float* A, float* B, int row, int col)
+{
+  float result = 0.0f;
+  for (int i = 0; i < row; i++) 
+  {
+    for (int j = 0; j < col; j++) 
+    {
+      int idx = i * col + j;
+      result += fabsf(A[idx] - B[idx]);
+    }
+  }
+
+  return result;
+}
+
+float l2_norm_1d(float* A, float* B, int size)
 {
   float result = 0.0f;
   for (int i = 0; i < size; i++) 
@@ -25,6 +40,21 @@ float l2_norm(float* A, float* B, int size)
 
   return sqrtf(result);
 }
+
+float l2_norm_2d(float* A, float* B, int row, int col)
+{
+  float result = 0.0f;
+  for (int i = 0; i < row; i++) 
+  {
+    for (int j = 0; j < col; j++) 
+    {
+      int idx = i * col + j;
+      result += (A[idx] - B[idx]) * (A[idx] - B[idx]);
+    }
+  }
+  return sqrtf(result);
+}
+
 
 float* get_l1_result(
   float* wavelet,
@@ -45,7 +75,7 @@ float* get_l1_result(
       phase
     );
 
-    result[i] = l1_norm(
+    result[i] = l1_norm_1d(
       wavelet,
       ricker_phase,
       nt

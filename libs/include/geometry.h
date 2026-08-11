@@ -3,6 +3,8 @@
 
 #include <stdio.h>
 
+#define GEOMETRY_ONLYRECEIVERS (1U << 0)
+
 typedef struct
 {
   float* x;
@@ -35,7 +37,9 @@ typedef struct geometry_t
   int offset_rec;
   int offset_src;
 
-  size_t nrec, nsrc;
+  int dh;
+
+  int nrec, nsrc;
 } geometry_t;
 
 geometry_t* Geometry_InitLoad(geometry_t* g);
@@ -48,7 +52,8 @@ void Geometry_Load(
   const char* SRC_PATH
 );
 
-void Geometry_Create(geometry_t *geom);
+void Geometry_SetSource(geometry_t* geom, int sx, int sz);
+void Geometry_Create(geometry_t *geom, unsigned flags);
 
 #endif /* end of include guard: GEOMETRY_H */
 

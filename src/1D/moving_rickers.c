@@ -26,7 +26,7 @@ float* moving_rickers_l1(
       phase
     );
 
-    result[i] = l1_norm(
+    result[i] = l1_norm_1d(
       wavelet,
       ricker_phase,
       nt
@@ -61,7 +61,7 @@ float* moving_rickers_l2(
       phase
     );
 
-    result[i] = l2_norm(
+    result[i] = l2_norm_1d(
       wavelet,
       ricker_phase,
       nt

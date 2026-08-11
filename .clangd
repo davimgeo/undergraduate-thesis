@@ -1,5 +1,5 @@
 CompileFlags:
   Add:
     - -I/home/lum/coding/objective-functions/include
-    - -I/home/lum/coding/objective-functions/libs/wave-modeling/include
+    - -I/home/lum/coding/objective-functions/libs/include
     - -I/home/lum/coding/objective-functions/src

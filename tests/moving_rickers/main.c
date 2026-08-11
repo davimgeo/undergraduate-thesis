@@ -1,12 +1,12 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "include/IO.h"
+#include "IO.h"
 
-#include "include/1D/ricker.h"
-#include "include/1D/moving_rickers.h"
+#include "1D/ricker.h"
+#include "1D/moving_rickers.h"
 
-#include "include/plot.h"
+#include "plot.h"
 
 int main()
 {

@@ -1,15 +1,20 @@
+CC = gcc
+
 FLAGS = -std=c99 -Wall -fopenmp -mavx2 -mfma -O3 -march=native
-INCLUDE = -Iinclude
+
+INCLUDE = -Iinclude -Ilibs/include -Iconfig
 
 LIBS = -lfftw3f -lm
 
-#MAIN = main1d.c
-MAIN = test.c
-
-SRCS = src/1D/*.c
+MAIN = main.c
+SRCS = $(wildcard config/*.c) $(wildcard src/1D/*.c)
 
 run:
-	gcc $(FLAGS) $(MAIN) $(INCLUDE) $(SRCS) -o run.out $(LIBS)
+	$(CC) $(FLAGS) $(INCLUDE) \
+		$(MAIN) $(SRCS) \
+		-Llibs -lprop \
+		$(LIBS) \
+		-o run.out
 	./run.out
 	$(MAKE) clean
 
@@ -18,5 +23,4 @@ clean:
 
 plot:
 	$(MAKE) run
-
 	python3 plots/plot_1d.py
