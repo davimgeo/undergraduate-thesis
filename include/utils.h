@@ -3,6 +3,7 @@
 
 #include <math.h>
 #include <stdlib.h>
+#include <stdio.h>
 #include <complex.h>
 #include <time.h>
 
@@ -16,6 +17,12 @@
                      (end.tv_nsec - start.tv_nsec) / 1e9; \
     printf("Elapsed: %.4f seconds\n", elapsed);           \
 } while (0)
+
+static inline void progress_bar(int counter, int total_counter)
+{
+  printf("Progress: %.1f%%\n", 100.0f * (float)(counter + 1) / total_counter);
+  printf("\e[1;1H\e[2J");
+}
 
 static inline float* magnitude(const float complex* arr, int height, int width)
 {

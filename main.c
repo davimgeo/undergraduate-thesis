@@ -1,21 +1,24 @@
 #include <stdlib.h>
 #include <propagation.h>
 
-#include "1D/cross.objf.h"
-#include "1D/euclidian.h"
+#include "cross.objf.h"
+#include "decon_objf.h"
+#include "euclidian.h"
 #include "utils.h"
 #include "config/config.h"
 #include "plot.h"
 #include "IO.h"
 
-#define NZ          201
-#define NX          201
-#define V0          2500
-#define REF_ALPHA   1.2f
+#define NZ          1001
+#define NX          501
+#define V0          2000
+#define REF_ALPHA   0.3
 
-#define SIZE        51
-#define ALPHA_MIN   0.6f
-#define ALPHA_MAX   5.0f
+#define SIZE        41
+#define ALPHA_MIN   -1.0f
+#define ALPHA_MAX   1.0f
+
+#define T0          50
 
 float* get_model(int nz, int nx, int v0, float alpha)
 {
@@ -23,8 +26,13 @@ float* get_model(int nz, int nx, int v0, float alpha)
   if (model == NULL) return NULL;
 
   for (int i = 0; i < nz; i++)
+  {
     for (int j = 0; j < nx; j++)
-      model[i * nx + j] = v0 + i / alpha;
+    {
+      float dz = (nz - (float)i) / nz;
+      model[i * nx + j] = v0 + alpha * i * dz;
+    }
+  }
 
   return model;
 }
@@ -74,49 +82,39 @@ int main()
 
   SpecsContext* specs = Specs_Init(NULL);
 
-  geometry_t* geom = Geometry_InitCreate(
-    NULL,
-    &specs->geometry
-  );
+  geometry_t* geom = Geometry_InitCreate(NULL, &specs->geometry);
   Geometry_Create(geom, GEOMETRY_ONLYRECEIVERS);
-  Geometry_SetSource(geom, 108, 30);
+  Geometry_SetSource(geom, 501, 30);
 
-  wavelet_t* wave = Wavelet_Init(
-    NULL,
-    &specs->wavelet
-  );
+  wavelet_t* wave = Wavelet_Init(NULL, &specs->wavelet);
   Wavelet_Create(wave);
 
   float* dobs = get_dobs(specs, geom, wave);
 
+  float* alphas = (float*)malloc(sizeof(float) * SIZE);
   float* result = (float*)malloc(SIZE * sizeof(float));
   if (result == NULL) return -1;
 
   for (int i = 0; i < SIZE; i++)
   {
     float da = (ALPHA_MAX - ALPHA_MIN) / SIZE;
-    float alpha = ALPHA_MIN + i * da;
+    alphas[i] = ALPHA_MIN + i * da;
 
-    float* grad_model = get_model(
-      NZ,
-      NX,
-      V0,
-      alpha
-    );
+    float* grad_model = get_model(NZ, NX, V0, alphas[i]);
 
-    model_t* grad_model_obj = Model_Init(
-      NULL,
-      &specs->model
-    );
+    model_t* grad_model_obj = Model_Init(NULL, &specs->model);
 
     Model_Set(grad_model_obj, grad_model);
     Model_Extent(grad_model_obj);
 
-    seismogram_t* seis_grad = Seismogram_Init(
-      NULL,
-      &specs->seismogram,
-      geom->nrec
-    );
+    if(i == 10)
+      plot_geometry_model(
+          grad_model_obj->vp, grad_model_obj->nxx, grad_model_obj->nzz,
+          geom->rec.x, geom->rec.z, geom->nrec,
+          geom->src.x, geom->src.z, geom->nsrc
+      );
+
+    seismogram_t* seis_grad = Seismogram_Init(NULL, &specs->seismogram, geom->nrec);
 
     propagation_t* prop_grad = Propagation_Init(
       NULL,
@@ -132,17 +130,31 @@ int main()
 
     float* dcalc = seis_grad->seismogram;
 
-    // not working, forgot I only did for 1d case
-    result[i] = get_cross_result(
-        dobs, dcalc, seis_grad->dt, seis_grad->nt, 30
+    result[i] = get_cross_2d(
+        dcalc, dobs, seis_grad->dt, 
+        seis_grad->nt, seis_grad->nrec, T0
     );
+
+    //result[i] = get_decon_2d(
+    //    dcalc, dobs, seis_grad->dt,
+    //    seis_grad->nt, seis_grad->nrec, T0
+    //);
+
+    //result[i] = l2_norm_2d(dcalc, dobs, seis_grad->nt, seis_grad->nrec);
+
+    printf("Objective Function: %g, Alpha: %g\n", result[i], alphas[i]);
+
+    progress_bar(i, SIZE);
   }
+
+  normalize(result, SIZE);
 
   PROFILE_END();
 
   plot1d(result, SIZE);
 
-  write1d("data/l1_norm_51.bin", result, sizeof(float), SIZE);
+  //write1d("data/decon_51.bin", result, sizeof(float), SIZE);
+  //write1d("data/alphas.bin", alphas, sizeof(float), SIZE);
 
   return 0;
 }

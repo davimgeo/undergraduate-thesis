@@ -3,8 +3,8 @@
 
 #include "IO.h"
 
-#include "1D/ricker.h"
-#include "1D/moving_rickers.h"
+#include "ricker.h"
+#include "moving_rickers.h"
 
 #include "plot.h"
 

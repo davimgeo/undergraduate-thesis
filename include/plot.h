@@ -110,6 +110,9 @@ static inline void plot2d(
 
   fprintf(gnuplot, "set palette gray\n");
 
+  fprintf(gnuplot, "set colorbox\n");
+  fprintf(gnuplot, "set colorbox vertical\n");
+
   fprintf(gnuplot, "set lmargin at screen 0.08\n");
   fprintf(gnuplot, "set rmargin at screen 0.98\n");
   fprintf(gnuplot, "set bmargin at screen 0.08\n");

@@ -1,12 +1,13 @@
 #include <stdlib.h>
+#include <stdbool.h>
 
-#include "include/IO.h"
+#include "IO.h"
 #include "utils.h"
 
-#include "include/1D/ricker.h"
-#include "include/1D/moving_rickers.h"
+#include "ricker.h"
+#include "moving_rickers.h"
 
-#include "include/plot.h"
+#include "plot.h"
 
 int main()
 {
@@ -20,7 +21,7 @@ int main()
 
   float t0 = 200;
 
-  #if 0
+  #if 1
   float* ricker1 = get_ricker(nt, fmax, dt, 0.6f);
   float* ricker2 = get_ricker(nt, fmax, dt, 0.05f);
 
@@ -38,10 +39,10 @@ int main()
   float* l2 = moving_rickers_l2(ricker, nt, result_size);
   float* decon = moving_rickers_decon(ricker, nt, result_size, fmax, dt, t0);
 
-  write1d("data/1d/h_cor.bin", cross, sizeof(float), result_size);
-  write1d("data/1d/l1.bin", l1, sizeof(float), result_size);
-  write1d("data/1d/l2.bin", l2, sizeof(float), result_size);
-  write1d("data/1d/decon.bin", decon, sizeof(float), result_size);
+  //write1d("data/1d/h_cor.bin", cross, sizeof(float), result_size);
+  //write1d("data/1d/l1.bin", l1, sizeof(float), result_size);
+  //write1d("data/1d/l2.bin", l2, sizeof(float), result_size);
+  //write1d("data/1d/decon.bin", decon, sizeof(float), result_size);
 
   free(ricker);
   free(cross);
@@ -50,5 +51,4 @@ int main()
   free(decon);
 
   PROFILE_END();
-
 }

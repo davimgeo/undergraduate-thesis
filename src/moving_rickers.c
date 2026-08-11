@@ -2,10 +2,10 @@
 
 #include "utils.h"
 
-#include "1D/ricker.h"
-#include "1D/euclidian.h"
-#include "1D/cross.objf.h"
-#include "1D/decon_objf.h"
+#include "ricker.h"
+#include "euclidian.h"
+#include "cross.objf.h"
+#include "decon_objf.h"
 
 float* moving_rickers_l1(
   float* wavelet,
@@ -99,7 +99,7 @@ float* moving_rickers_cross(
       phase
     );
 
-    result[i] = get_cross_result(
+    result[i] = get_cross_1d(
       u_s,
       u_o,
       dt,
@@ -139,7 +139,7 @@ float* moving_rickers_decon(
       phase
     );
 
-    result[i] = get_decon_result(
+    result[i] = get_decon_1d(
       u_s,
       u_o,
       dt,

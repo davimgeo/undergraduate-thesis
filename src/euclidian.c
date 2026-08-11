@@ -2,7 +2,7 @@
 #include <stdlib.h>
 
 #include "utils.h"
-#include "1D/ricker.h"
+#include "ricker.h"
 
 float l1_norm_1d(float* A, float* B, int size)
 {

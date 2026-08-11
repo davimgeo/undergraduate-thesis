@@ -1,5 +1,4 @@
 #include <stdlib.h>
-#include <math.h>
 #include <complex.h>
 
 #define PI 3.14159265358979323846f

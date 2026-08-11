@@ -1,5 +1,5 @@
 CompileFlags:
   Add:
-    - -I/home/lum/coding/objective-functions/include
-    - -I/home/lum/coding/objective-functions/libs/include
-    - -I/home/lum/coding/objective-functions/src
+    - -I/home/lum/coding/undergraduate-thesis/include
+    - -I/home/lum/coding/undergraduate-thesis/libs/include
+    - -I/home/lum/coding/undergraduate-thesis/src
