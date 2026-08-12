@@ -6,6 +6,7 @@
 #include "euclidian.h"
 #include "utils.h"
 #include "config/config.h"
+#include "plot2.h"
 #include "plot.h"
 #include "IO.h"
 
@@ -107,12 +108,23 @@ int main()
     Model_Set(grad_model_obj, grad_model);
     Model_Extent(grad_model_obj);
 
-    if(i == 10)
-      plot_geometry_model(
-          grad_model_obj->vp, grad_model_obj->nxx, grad_model_obj->nzz,
-          geom->rec.x, geom->rec.z, geom->nrec,
-          geom->src.x, geom->src.z, geom->nsrc
+    if(i == 1) 
+    {
+      model_t* m = grad_model_obj;
+      plot_model_geometry(
+        m->vp,
+        m->nx,
+        m->nz,
+        m->nb,
+        specs->propagation.dh, 
+        geom->rec.x,
+        geom->rec.z,
+        geom->nrec,
+        geom->src.x,
+        geom->src.z,
+        geom->nsrc
       );
+    }
 
     seismogram_t* seis_grad = Seismogram_Init(NULL, &specs->seismogram, geom->nrec);
 

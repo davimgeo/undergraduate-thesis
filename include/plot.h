@@ -1,308 +1,414 @@
-#ifndef PLOT_H
-#define PLOT_H
+#pragma once
 
-#include <stdio.h>
-#include <stdlib.h>
+#include <Python.h>
 
-#include <complex.h>
+#define NPY_NO_DEPRECATED_API NPY_1_7_API_VERSION
+#include <numpy/arrayobject.h>
 
-#ifdef _WIN32
-    #define popen  _popen
-    #define pclose _pclose
-#endif
+#define PLOT_MODULE "plot"
 
-static inline void plot1d(
-  const float* arr,
-  int size
+static int plot_python_initialized = 0;
+
+static inline int plot_python_init(void)
+{
+  if (plot_python_initialized) return 0;
+
+  Py_Initialize();
+  if (!Py_IsInitialized()) return -1;
+  
+  if (_import_array() < 0) 
+  {
+    PyErr_Print();
+    Py_Finalize();
+    return -1;
+  }
+
+  PyRun_SimpleString(
+      "import sys, os; "
+      "sys.path.insert(0, os.path.expanduser('~/plots/src'))"
+  );
+
+  plot_python_initialized = 1;
+
+  return 0;
+}
+
+static inline void plot_python_finalize(void)
+{
+  if (!plot_python_initialized) return;
+
+  Py_Finalize();
+
+  plot_python_initialized = 0;
+}
+
+static inline int plot_model(float *model, int nx, int nz)
+{
+  if (plot_python_init() != 0) return -1;
+
+  PyObject *name = PyUnicode_FromString(PLOT_MODULE);
+
+  if (!name) 
+  {
+    PyErr_Print();
+    return -1;
+  }
+
+  PyObject *module = PyImport_Import(name);
+
+  Py_DECREF(name);
+
+  if (!module) 
+  {
+    PyErr_Print();
+    return -1;
+  }
+
+  PyObject *func = PyObject_GetAttrString(module, "plot_model");
+  if (!func || !PyCallable_Check(func)) 
+  {
+    PyErr_Print();
+    Py_XDECREF(func);
+    Py_DECREF(module);
+    return -1;
+  }
+
+  npy_intp dims[2] = {nz, nx};
+
+  PyObject *py_model =
+      PyArray_SimpleNewFromData(
+          2,
+          dims,
+          NPY_FLOAT32,
+          model
+      );
+
+  if (!py_model) 
+  {
+    PyErr_Print();
+    Py_DECREF(func);
+    Py_DECREF(module);
+    return -1;
+  }
+
+  PyObject *args = PyTuple_Pack(1, py_model);
+
+  if (!args) 
+  {
+    PyErr_Print();
+    Py_DECREF(py_model);
+    Py_DECREF(func);
+    Py_DECREF(module);
+    return -1;
+  }
+
+  PyObject *result = PyObject_CallObject(func, args);
+  if (!result) PyErr_Print();
+
+  Py_XDECREF(result);
+  Py_DECREF(args);
+  Py_DECREF(py_model);
+  Py_DECREF(func);
+  Py_DECREF(module);
+
+  return result ? 0 : -1;
+}
+
+static inline int plot_seismogram(
+    float *seismogram,
+    int nt,
+    int nrec,
+    float dt,
+    int offset
 )
 {
-  FILE* gnuplot = popen("gnuplot -persistent", "w");
+    if (plot_python_init() != 0) return -1;
 
-  if (!gnuplot) {
-      fprintf(stderr, "Could not start gnuplot!\n");
-      return;
-  }
-
-  fprintf(gnuplot, "set term qt size 1400,600\n");
-
-  fprintf(gnuplot,
-      "plot '-' binary "
-      "format='%%float' "
-      "array=%d "
-      "with lines notitle\n",
-      size);
-
-  fwrite(arr, sizeof(float), size, gnuplot);
-
-  fprintf(gnuplot, "\n");
-  fprintf(gnuplot, "pause mouse close\n");
-
-  fflush(gnuplot);
-  pclose(gnuplot);
-}
-
-static inline void plot1d_2(
-  const float* arr1,
-  const float* arr2,
-  int size
-)
-{
-  FILE* gnuplot = popen("gnuplot -persistent", "w");
-
-  if (!gnuplot) {
-    fprintf(stderr, "Could not start gnuplot!\n");
-    return;
-  }
-
-  fprintf(gnuplot, "set term qt size 1400,600\n");
-
-  fprintf(gnuplot,
-      "plot "
-      "'-' binary format='%%float' array=%d "
-      "with lines title 'arr1', "
-      "'-' binary format='%%float' array=%d "
-      "with lines title 'arr2'\n",
-      size,
-      size);
-
-  fflush(gnuplot);
-
-  fwrite(arr1,
-         sizeof(float),
-         (size_t)size,
-         gnuplot);
-
-  fwrite(arr2,
-         sizeof(float),
-         (size_t)size,
-         gnuplot);
-
-         
-  fprintf(gnuplot, "\n");
-  fprintf(gnuplot, "pause mouse close\n");
-         
-  fflush(gnuplot);
-
-  pclose(gnuplot);
-}
-
-static inline void plot2d(
-    const float* arr,
-    int width,
-    int height)
-{
-  FILE* gnuplot = popen("gnuplot -persistent", "w");
-
-  if (!gnuplot) {
-    fprintf(stderr, "Could not start gnuplot!\n");
-    return;
-  }
-
-  fprintf(gnuplot, "set term qt size 1400,600\n");
-
-  fprintf(gnuplot, "set view map\n");
-  fprintf(gnuplot, "unset key\n");
-
-  fprintf(gnuplot, "set size noratio\n");
-
-  fprintf(gnuplot, "set xrange [0:%d]\n", width - 1);
-  fprintf(gnuplot, "set yrange [%d:0]\n", height - 1);
-
-  fprintf(gnuplot, "set palette gray\n");
-
-  fprintf(gnuplot, "set colorbox\n");
-  fprintf(gnuplot, "set colorbox vertical\n");
-
-  fprintf(gnuplot, "set lmargin at screen 0.08\n");
-  fprintf(gnuplot, "set rmargin at screen 0.98\n");
-  fprintf(gnuplot, "set bmargin at screen 0.08\n");
-  fprintf(gnuplot, "set tmargin at screen 0.98\n");
-
-  fprintf(gnuplot,
-      "plot '-' binary "
-      "array=(%d,%d) "
-      "format='%%float' "
-      "with image\n",
-      width,
-      height);
-
-  fflush(gnuplot);
-
-  fwrite(arr,
-         sizeof(float),
-         (size_t)width * height,
-         gnuplot);
-
-         
-  fprintf(gnuplot, "\n");
-  fprintf(gnuplot, "pause mouse close\n");
-         
-  fflush(gnuplot);
-
-  pclose(gnuplot);
-}
-
-static inline void plot2d_line_cols(
-  const float* arr,
-  int col,
-  int rows,
-  int cols
-)
-{
-  float* temp = (float*)malloc(sizeof(float) * rows);
-
-  for (int i = 0; i < rows; i++) {
-    for (int j = 0; j < cols; j++) {
-      temp[i] = arr[i * cols + j];
-    }
-  }
-
-  plot1d(temp, rows);
-}
-
-static inline void plot_geometry_model(
-    const float* model,
-    int nx, int nz,
-    const float* rec_x, const float* rec_z, int nrec,
-    const float* src_x, const float* src_z, int nsrc)
-{
-    FILE* gnuplot_pipe = popen("gnuplot -persistent", "w");
-
-    if (!gnuplot_pipe) {
-        fprintf(stderr, "Could not start gnuplot!\n");
-        return;
+    PyObject *name = PyUnicode_FromString(PLOT_MODULE);
+    if (!name) 
+    {
+      PyErr_Print();
+      return -1;
     }
 
-    fprintf(gnuplot_pipe,
-        "set title '%s'\n"
-        "set xlabel 'X'\n"
-        "set ylabel 'Z'\n"
-        "set size ratio -1\n"
-        "set yrange [%d:0]\n"
-        "set key outside\n",
-        "Figure", nz - 1);
+    PyObject *module = PyImport_Import(name);
 
-    fprintf(gnuplot_pipe,
-        "plot '-' matrix with image notitle, "
-        "'-' with points pt 7 ps 1.5 title 'Receivers', "
-        "'-' with points pt 5 ps 1.5 title 'Sources'\n");
+    Py_DECREF(name);
 
-    for (int z = 0; z < nz; ++z) {
-        for (int x = 0; x < nx; ++x) {
-            fprintf(
-                gnuplot_pipe,
-                "%f ",
-                model[z * nx + x]
-            );
-        }
-
-        fprintf(gnuplot_pipe, "\n");
+    if (!module) 
+    {
+      PyErr_Print();
+      return -1;
     }
 
-    fprintf(gnuplot_pipe, "e\n");
+    PyObject *func =
+        PyObject_GetAttrString(module, "plot_seismogram");
 
-    for (int i = 0; i < nrec; ++i) {
-        fprintf(
-            gnuplot_pipe,
-            "%f %f\n",
-            rec_x[i],
-            rec_z[i]
+    if (!func || !PyCallable_Check(func)) 
+    {
+      PyErr_Print();
+      Py_XDECREF(func);
+      Py_DECREF(module);
+      return -1;
+    }
+
+    npy_intp dims[2] = {nt, nrec};
+
+    PyObject *py_seismogram =
+        PyArray_SimpleNewFromData(
+            2,
+            dims,
+            NPY_FLOAT32,
+            seismogram
         );
+
+    if (!py_seismogram) 
+    {
+      PyErr_Print();
+      Py_DECREF(func);
+      Py_DECREF(module);
+      return -1;
     }
 
-    fprintf(gnuplot_pipe, "e\n");
+    PyObject *dt_obj = PyFloat_FromDouble(dt);
 
-    for (int i = 0; i < nsrc; ++i) {
-        fprintf(
-            gnuplot_pipe,
-            "%f %f\n",
-            src_x[i],
-            src_z[i]
+    PyObject *offset_obj = PyLong_FromLong(offset);
+
+    if (!dt_obj || !offset_obj) 
+    {
+      PyErr_Print();
+
+      Py_XDECREF(dt_obj);
+      Py_XDECREF(offset_obj);
+
+      Py_DECREF(py_seismogram);
+      Py_DECREF(func);
+      Py_DECREF(module);
+
+      return -1;
+    }
+
+    PyObject *args =
+        PyTuple_Pack(
+            3,
+            py_seismogram,
+            dt_obj,
+            offset_obj
         );
+
+    Py_DECREF(dt_obj);
+    Py_DECREF(offset_obj);
+
+    if (!args) 
+    {
+      PyErr_Print();
+
+      Py_DECREF(py_seismogram);
+      Py_DECREF(func);
+      Py_DECREF(module);
+
+      return -1;
     }
 
-    fprintf(gnuplot_pipe, "e\n");
+    PyObject *result = PyObject_CallObject(func, args);
+    if (!result) PyErr_Print();
 
-    fprintf(gnuplot_pipe, "pause mouse close\n");
+    Py_XDECREF(result);
+    Py_DECREF(args);
+    Py_DECREF(py_seismogram);
+    Py_DECREF(func);
+    Py_DECREF(module);
 
-    fflush(gnuplot_pipe);
-    pclose(gnuplot_pipe);
+    return result ? 0 : -1;
 }
 
-static inline void plot2d_line_rows(
-  const float* arr,
-  int row,
-  int rows,
-  int cols
+static inline int err_name(PyObject* name)
+{
+  if (!name)
+  {
+    PyErr_Print();
+    return -1;
+  }
+  return 0;
+}
+
+static inline int plot_model_geometry(
+  const float *model,
+  int nz,
+  int nx,
+  int nb,
+  int dh,
+  const float *recx,
+  const float *recz,
+  int nrec,
+  const float *srcx,
+  const float *srcz,
+  int nsrc
 )
 {
-  float* temp = (float*)malloc(sizeof(float) * cols);
+  if (plot_python_init() != 0) return -1;
 
-  for (int i = 0; i < cols; i++) {
-    for (int j = 0; j < rows; j++) {
-      temp[i] = arr[i * rows + j];
-    }
+  PyObject *name = PyUnicode_FromString(PLOT_MODULE);
+  err_name(name);
+
+  PyObject *module = PyImport_Import(name);
+  Py_DECREF(name);
+
+  if (!module)
+  {
+    PyErr_Print();
+    return -1;
   }
 
-  plot1d(temp, cols);
+  PyObject *func = PyObject_GetAttrString(
+    module,
+    "plot_model_geometry"
+  );
+
+  if (!func || !PyCallable_Check(func))
+  {
+    PyErr_Print();
+    Py_XDECREF(func);
+    Py_DECREF(module);
+    return -1;
+  }
+
+  npy_intp model_dims[2] = {nz, nx};
+
+  PyObject *py_model = PyArray_SimpleNewFromData(
+    2,
+    model_dims,
+    NPY_FLOAT32,
+    (void *)model
+  );
+
+  npy_intp rec_dims[1] = {nrec};
+
+  PyObject *py_recx = PyArray_SimpleNewFromData(
+    1,
+    rec_dims,
+    NPY_FLOAT32,
+    (void *)recx
+  );
+
+  PyObject *py_recz = PyArray_SimpleNewFromData(
+    1,
+    rec_dims,
+    NPY_FLOAT32,
+    (void *)recz
+  );
+
+  npy_intp src_dims[1] = {nsrc};
+
+  PyObject *py_srcx = PyArray_SimpleNewFromData(
+    1,
+    src_dims,
+    NPY_FLOAT32,
+    (void *)srcx
+  );
+
+  PyObject *py_srcz = PyArray_SimpleNewFromData(
+    1,
+    src_dims,
+    NPY_FLOAT32,
+    (void *)srcz
+  );
+
+  if (!py_model || !py_recx || !py_recz || !py_srcx || !py_srcz)
+  {
+    PyErr_Print();
+
+    Py_XDECREF(py_model);
+    Py_XDECREF(py_recx);
+    Py_XDECREF(py_recz);
+    Py_XDECREF(py_srcx);
+    Py_XDECREF(py_srcz);
+
+    Py_DECREF(func);
+    Py_DECREF(module);
+
+    return -1;
+  }
+
+  PyObject *py_nz = PyLong_FromLong(nz);
+  PyObject *py_nx = PyLong_FromLong(nx);
+  PyObject *py_dh = PyLong_FromLong(dh);
+  PyObject *py_nb = PyLong_FromLong(nb);
+
+  if (!py_nz || !py_nx || !py_dh)
+  {
+    PyErr_Print();
+
+    Py_XDECREF(py_nz);
+    Py_XDECREF(py_nx);
+    Py_XDECREF(py_dh);
+    Py_XDECREF(py_nb);
+
+    Py_DECREF(py_model);
+    Py_DECREF(py_recx);
+    Py_DECREF(py_recz);
+    Py_DECREF(py_srcx);
+    Py_DECREF(py_srcz);
+
+    Py_DECREF(func);
+    Py_DECREF(module);
+
+    return -1;
+  }
+
+  PyObject *args = PyTuple_Pack(
+    7,
+    py_model,
+    py_nb,
+    py_dh,
+    py_recx,
+    py_recz,
+    py_srcx,
+    py_srcz
+  );
+
+  Py_DECREF(py_nz);
+  Py_DECREF(py_nx);
+  Py_DECREF(py_dh);
+
+  if (!args)
+  {
+    PyErr_Print();
+
+    Py_DECREF(py_model);
+    Py_DECREF(py_recx);
+    Py_DECREF(py_recz);
+    Py_DECREF(py_srcx);
+    Py_DECREF(py_srcz);
+
+    Py_DECREF(func);
+    Py_DECREF(module);
+
+    return -1;
+  }
+
+  PyObject *result = PyObject_CallObject(func, args);
+
+  if (!result)
+  {
+    PyErr_Print();
+  }
+
+  Py_XDECREF(result);
+  Py_DECREF(args);
+
+  Py_DECREF(py_model);
+  Py_DECREF(py_recx);
+  Py_DECREF(py_recz);
+  Py_DECREF(py_srcx);
+  Py_DECREF(py_srcz);
+
+  Py_DECREF(func);
+  Py_DECREF(module);
+
+  return result ? 0 : -1;
 }
 
-static inline void plot2d_imag(
-  const float complex* arr,
-  int width,
-  int height)
-{
-  float* imag = malloc(sizeof(float) * width * height);
 
-  for (int i = 0; i < width * height; i++)
-    imag[i] = cimagf(arr[i]);
 
-  plot2d(imag, width, height);
-
-  free(imag);
-}
-
-static inline void plot1d_imag(
-  const float complex* arr,
-  int size)
-{
-  float* imag = malloc(sizeof(float) * size);
-
-  for (int i = 0; i < size; i++)
-    imag[i] = cimagf(arr[i]);
-
-  plot1d(imag, size);
-
-  free(imag);
-}
-
-static inline void plot1d_magnitude(
-  const float complex* arr,
-  int size)
-{
-  float* mag = malloc(sizeof(float) * size);
-
-  for (int i = 0; i < size; i++)
-    mag[i] = cabsf(arr[i]);
-
-  plot1d(mag, size);
-
-  free(mag);
-}
-
-static inline void plot2d_real(
-  const float complex* arr,
-  int width,
-  int height)
-{
-  float* real = malloc(sizeof(float) * width * height);
-
-  for (int i = 0; i < width * height; i++)
-    real[i] = crealf(arr[i]);
-
-  plot2d(real, width, height);
-
-  free(real);
-}
-#endif /* PLOT_H */
 
