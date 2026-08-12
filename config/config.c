@@ -17,24 +17,24 @@ SpecsContext* Specs_Init(SpecsContext* specs)
 
     .geometry =
     {
-      .line_length = 501,
+      .line_length = 201,
 
       .src_depth = 10,
       .rec_depth = 8,
 
-      .offset_rec = 5,
+      .offset_rec = 10,
       .offset_src = 100
     },
 
     .model =
     {
-      .nx = 501,
-      .nz = 1001,
-      .nb = 100,
+      .nx = 201,
+      .nz = 401,
+      .nb = 50,
 
       .interfaces_size = 1,
 
-      .interfaces = {120},
+      .interfaces = {350},
       .values = {1500.0f, 2000.0f}
     },
 

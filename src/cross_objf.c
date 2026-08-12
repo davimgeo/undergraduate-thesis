@@ -79,8 +79,7 @@ static float* get_c_2d(float* u_s, float* u_o, float dt, int nt, int nrec)
 
   float complex* cross = malloc(sizeof(float complex) * nt * nrec);
 
-  for (int i = 0; i < nt * nrec; i++)
-      cross[i] = C_u_s[i] * Im_u_o[i];
+  for (int i = 0; i < nt * nrec; i++) cross[i] = C_u_s[i] * Im_u_o[i];
 
   float* result = get_ifft_2d(cross, nt, nrec);
 
