@@ -1,6 +1,6 @@
 CC = gcc
 
-FLAGS = -std=c99 -Wall -fopenmp -mavx2 -mfma -O3 -march=native
+FLAGS = -std=c99 -fopenmp -mavx2 -mfma -O3 -march=native
 
 INCLUDE = -Iinclude -Ilibs/include -Iconfig
 

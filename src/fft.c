@@ -1,3 +1,5 @@
+#include "IO.h"
+#include "plot.h"
 #include <complex.h>
 #include <stdlib.h>
 #include <string.h>
@@ -85,31 +87,26 @@ float complex* get_fft_2d(float* arr, int row, int col)
   return result;
 }
 
-float* get_ifft_2d(float complex* arr, int row, int col)
+float* get_ifft_2d(float complex* in, int row, int col)
 {
   int N = row * col;
 
-  fftwf_complex* in = (fftwf_complex*) fftwf_malloc(sizeof(fftwf_complex) * N);
-  fftwf_complex* out = (fftwf_complex*) fftwf_malloc(sizeof(fftwf_complex) * N);
+  float* result = malloc(sizeof(float) * N);
+  if (result == NULL) return NULL;
 
-  memcpy(in, arr, sizeof(fftwf_complex) * N);
+  fftwf_complex* out = fftwf_malloc(sizeof(fftwf_complex) * N);
+  if (out == NULL) return NULL;
 
-  fftwf_plan p = fftwf_plan_dft_2d(row, col, in, out, FFTW_BACKWARD, FFTW_ESTIMATE);
+  fftwf_plan plan = fftwf_plan_dft_2d(
+      row, col,(fftwf_complex*)in, out, FFTW_BACKWARD,FFTW_ESTIMATE
+  );
 
-  fftwf_execute(p);
+  fftwf_execute(plan);
 
-  float* result = (float*)malloc(N * sizeof(float));
-  for (int i = 0; i < row; i++) 
-  {
-    for (int j = 0; j < col; j++) 
-    {
-      int idx = i * col + j;
-      result[idx] = (out[idx] + 0.0f * I) / (float)N;
-    }
-  }
+  for (int i = 0; i < N; i++) result[i] = crealf(out[i]) / N;
 
-  fftwf_destroy_plan(p);
-  fftwf_free(in); fftwf_free(out);
+  fftwf_destroy_plan(plan);
+  fftwf_free(out);
 
   return result;
 }

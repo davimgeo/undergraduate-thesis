@@ -53,6 +53,7 @@ void Geometry_Load(
 );
 
 void Geometry_SetSource(geometry_t* geom, int sx, int sz);
+void Geometry_SetReceiver(geometry_t* geom, int rx, int rz);
 void Geometry_Create(geometry_t *geom, unsigned flags);
 
 #endif /* end of include guard: GEOMETRY_H */

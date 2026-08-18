@@ -5,7 +5,6 @@
 #include "fft.h"
 #include "decon_objf.h"
 #include "euclidian.h"
-#include "geometry.h"
 #include "utils.h"
 #include "config/config.h"
 #include "plot.h"
@@ -16,11 +15,46 @@
 #define V0          2000.0f
 #define REF_ALPHA   0.5
 
-#define SIZE        21
+#define SIZE        51
 #define ALPHA_MIN   0
 #define ALPHA_MAX   1.0f
 
 #define T0          50
+
+float* get_model_layer(
+  int nz,
+  int nx,
+  int v0,
+  float alpha,
+  int interface,
+  float layer_value
+)
+{
+  float* model = (float*)malloc(nz * nx * sizeof(float));
+  if (model == NULL) return NULL;
+
+  for (int i = 0; i < nz; i++)
+  {
+    float velocity;
+
+    if (i <= interface)
+    {
+      //float z = (float)i / (float)(interface - 1);
+
+      //velocity = v0 + alpha * (layer_value - v0) * z;
+      velocity = v0;
+    }
+    else
+    {
+      velocity = layer_value;
+    }
+
+    for (int j = 0; j < nx; j++)
+        model[i * nx + j] = velocity;
+  }
+
+  return model;
+}
 
 float* get_model(int nz, int nx, int v0, float alpha)
 {
@@ -85,7 +119,7 @@ int main()
   SpecsContext* specs = Specs_Init(NULL);
 
   geometry_t* geom = Geometry_InitCreate(NULL, &specs->geometry);
-  Geometry_SetReceiver(geom, 101, 0);
+  Geometry_Create(geom, GEOMETRY_ONLYRECEIVERS);
   Geometry_SetSource(geom, 101, 50);
 
   wavelet_t* wave = Wavelet_Init(NULL, &specs->wavelet);
@@ -154,4 +188,3 @@ int main()
 
   return 0;
 }
-
