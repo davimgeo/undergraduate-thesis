@@ -19,7 +19,7 @@
 #define ALPHA_MIN   0
 #define ALPHA_MAX   1.0f
 
-#define T0          50
+#define T0          100
 
 float* get_model_layer(
   int nz,

@@ -1,5 +1,6 @@
 CompileFlags:
   Add:
-    - -I/home/lum/coding/undergraduate-thesis/include
-    - -I/home/lum/coding/undergraduate-thesis/libs/include
-    - -I/home/lum/coding/undergraduate-thesis/src
+    - -I/home/malum/undergraduate-thesis/include
+    - -I/home/malum/undergraduate-thesis/config
+    - -I/home/malum/undergraduate-thesis/libs/include
+    - -I/home/malum/undergraduate-thesis/src

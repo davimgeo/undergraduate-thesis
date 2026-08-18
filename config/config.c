@@ -11,7 +11,7 @@ SpecsContext* Specs_Init(SpecsContext* specs)
     .wavelet =
     {
       .dt = 1e-3f,
-      .fmax = 30.0f,
+      .fmax = 50.0f,
       .nt = 4001
     },
 

@@ -10,18 +10,22 @@ static int initialized = 0;
 
 static float* get_penalty(int nt, float dt, float t0)
 {
-  float* P = (float*)malloc(nt * sizeof(float));
+  float* P = malloc(nt * sizeof(float));
 
-  for (int i = 0; i < nt; ++i) 
+  for (int i = 0; i < nt; ++i)
   {
-    float tau = (i - (float)nt/2) * dt;
+    float tau;
 
-    if(fabs(tau) <= t0) {
+    if (i <= nt / 2)
+      tau = i * dt;
+    else
+      tau = (i - nt) * dt;
+
+    if (fabsf(tau) <= t0)
       P[i] = tau;
-    } else {
+    else
       P[i] = 0.0f;
-    }
-  }  
+  }
 
   return P;
 }
@@ -71,19 +75,43 @@ float get_cross_1d(float *u_s, float *u_o, float dt, int nt, float t0)
   return (-0.5f * result);
 }
 
-static float* get_c_2d(float* u_s, float* u_o, float dt, int nt, int nrec)
+float* get_c_2d(
+    float* u_s,
+    float* u_o,
+    float dt,
+    int nt,
+    int nrec
+)
 {
-  float complex* fft_u_s = get_fft_2d(u_s, nt, nrec);
-  float complex* C_u_s   = conjugate2d(fft_u_s, nt, nrec);
-  float complex* Im_u_o  = get_fft_2d(u_o, nt, nrec);
+  float* result = malloc((size_t)nt * nrec * sizeof(float));
+  if (result == NULL) return NULL;
 
-  float complex* cross = malloc(sizeof(float complex) * nt * nrec);
+  float* trace_s = (float*)malloc(nt * sizeof(float));
+  float* trace_o = (float*)malloc(nt * sizeof(float));
 
-  for (int i = 0; i < nt * nrec; i++) cross[i] = C_u_s[i] * Im_u_o[i];
+  for (int rec = 0; rec < nrec; ++rec)
+  {
 
-  float* result = get_ifft_2d(cross, nt, nrec);
+    for (int t = 0; t < nt; ++t)
+    {
+      trace_s[t] = u_s[t * nrec + rec];
+      trace_o[t] = u_o[t * nrec + rec];
+    }
 
-  free(fft_u_s); free(C_u_s); free(Im_u_o); free(cross);
+    float* c = get_c_1d(
+        trace_s,
+        trace_o,
+        dt,
+        nt
+    );
+
+    for (int tau = 0; tau < nt; ++tau) result[tau * nrec + rec] = c[tau];
+
+    free(c);
+  }
+
+  free(trace_s);
+  free(trace_o);
 
   return result;
 }
@@ -117,5 +145,5 @@ float get_cross_2d(float *u_s, float *u_o, float dt, int nt, int nrec, float t0)
 
   free(c); free(P);
 
-  return (-0.5f * result);
+  return (0.5f * result);
 }

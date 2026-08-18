@@ -329,6 +329,86 @@ cleanup:
   return status;
 }
 
+int plot1d_compare(float* arr, float* arr2, int size)
+{
+  int status = -1;
+
+  PyObject *py_arr   = NULL;
+  PyObject *py_arr2  = NULL;
+  PyObject *args     = NULL;
+
+  if (plot_python_init() != 0) goto cleanup;
+
+  npy_intp dims[1] = {size};
+
+  py_arr = PyArray_SimpleNewFromData(
+    1,
+    dims,
+    NPY_FLOAT32,
+    arr
+  );
+  if (err_py(py_arr) != 0) goto cleanup;
+
+  py_arr2 = PyArray_SimpleNewFromData(
+    1,
+    dims,
+    NPY_FLOAT32,
+    arr2
+  );
+  if (err_py(py_arr2) != 0) goto cleanup;
+
+  args = PyTuple_Pack(2, py_arr, py_arr2);
+  if (err_py(args) != 0) goto cleanup;
+
+  status = plot_python_call("plot1d_compare", args);
+
+cleanup:
+  Py_XDECREF(args);
+  Py_XDECREF(py_arr);
+
+  return status;
+}
+
+int plot1d_xy(float* arr, float* arr2, int size)
+{
+  int status = -1;
+
+  PyObject *py_arr   = NULL;
+  PyObject *py_arr2  = NULL;
+  PyObject *args     = NULL;
+
+  if (plot_python_init() != 0) goto cleanup;
+
+  npy_intp dims[1] = {size};
+
+  py_arr = PyArray_SimpleNewFromData(
+    1,
+    dims,
+    NPY_FLOAT32,
+    arr
+  );
+  if (err_py(py_arr) != 0) goto cleanup;
+
+  py_arr2 = PyArray_SimpleNewFromData(
+    1,
+    dims,
+    NPY_FLOAT32,
+    arr2
+  );
+  if (err_py(py_arr2) != 0) goto cleanup;
+
+  args = PyTuple_Pack(2, py_arr, py_arr2);
+  if (err_py(args) != 0) goto cleanup;
+
+  status = plot_python_call("plot1d_xy", args);
+
+cleanup:
+  Py_XDECREF(args);
+  Py_XDECREF(py_arr);
+
+  return status;
+}
+
 int plot2d(float* arr, int row, int col)
 {
   int status = -1;

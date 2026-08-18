@@ -11,14 +11,12 @@
 #include "plot.h"
 #include "IO.h"
 
-#define INTERFACE   250
-#define LAYER_VALUE 2500.0f
 #define V0          2000.0f
-#define REF_ALPHA   0.5
+#define REF_ALPHA   3.5f
 
-#define SIZE        21
-#define ALPHA_MIN   0
-#define ALPHA_MAX   1.0f
+#define SIZE        51
+#define ALPHA_MIN   1.0f
+#define ALPHA_MAX   5.0f
 
 #define T0          50
 
@@ -85,7 +83,8 @@ int main()
   SpecsContext* specs = Specs_Init(NULL);
 
   geometry_t* geom = Geometry_InitCreate(NULL, &specs->geometry);
-  Geometry_SetReceiver(geom, 101, 0);
+  Geometry_Create(geom, 0);
+  // Geometry_SetReceiver(geom, 101, 0);
   Geometry_SetSource(geom, 101, 50);
 
   wavelet_t* wave = Wavelet_Init(NULL, &specs->wavelet);
@@ -93,10 +92,22 @@ int main()
 
   float* dobs = get_dobs(specs, geom, wave);
 
-  float* alphas = (float*)malloc(sizeof(float) * SIZE);
-  if (alphas == NULL) return -1;
-  float* cross = (float*)malloc(SIZE * sizeof(float));
-  if (cross == NULL) return -1;
+  float* alphas = malloc(SIZE * sizeof(float));
+  float* l2 = malloc(SIZE * sizeof(float));
+  float* l1 = malloc(SIZE * sizeof(float));
+  float* cross = malloc(SIZE * sizeof(float));
+  float* decon = malloc(SIZE * sizeof(float));
+
+  if (alphas == NULL || l2 == NULL || l1 == NULL ||
+      cross == NULL || decon == NULL)
+  {
+    free(alphas);
+    free(l2);
+    free(l1);
+    free(cross);
+    free(decon);
+    return -1;
+  }
 
   for (int i = 0; i < SIZE; i++)
   {
@@ -114,44 +125,62 @@ int main()
     Model_Set(grad_model_obj, grad_model);
     Model_Extent(grad_model_obj);
 
-    if(i == 1) plot_model_geometry(grad_model_obj, 10, geom);
-    if(i == SIZE - 1) plot_model_geometry(grad_model_obj, 10, geom);
-
-    seismogram_t* seis_grad = Seismogram_Init(NULL, &specs->seismogram, geom->nrec);
+    seismogram_t* seis_grad = Seismogram_Init(
+      NULL, &specs->seismogram, geom->nrec
+    );
 
     propagation_t* prop_grad = Propagation_Init(
-      NULL,
-      &specs->propagation,
-      grad_model_obj,
-      geom,
-      wave,
-      seis_grad,
-      PROPAGATION_ACOUSTIC
+      NULL, &specs->propagation, grad_model_obj, geom,
+      wave, seis_grad, PROPAGATION_ACOUSTIC
     );
+
     Propagation_GetDamp(prop_grad);
     Propagation_Run(prop_grad, 0);
 
     float* dcalc = seis_grad->seismogram;
+    int nt = seis_grad->nt;
+    int nrec = seis_grad->nrec;
+
+    l2[i] = l2_norm_2d(dcalc, dobs, nt, nrec);
+    l1[i] = l1_norm_2d(dcalc, dobs, nt, nrec);
 
     cross[i] = get_cross_2d(
-       dcalc, dobs, seis_grad->dt,
-        seis_grad->nt, seis_grad->nrec, T0
+      dcalc, dobs, seis_grad->dt, nt, nrec, T0
     );
 
-    printf("Objective Function: %g, Alpha: %g\n", cross[i], alphas[i]);
+    decon[i] = get_decon_2d(
+      dcalc, dobs, seis_grad->dt, nt, nrec, T0
+    );
+
+    printf("Alpha: %g | L2: %g | L1: %g | Cross: %g | Decon: %g\n",
+      alphas[i], l2[i], l1[i], cross[i], decon[i]);
 
     progress_bar(i, SIZE);
   }
 
+  normalize(l2, SIZE);
+  normalize(l1, SIZE);
   normalize(cross, SIZE);
+  normalize(decon, SIZE);
 
   PROFILE_END();
 
-  plot1d(cross, SIZE);
+  write1d("data/l2_51.bin", l2, sizeof(float), SIZE);
+  write1d("data/l1_51.bin", l1, sizeof(float), SIZE);
+  write1d("data/cross_51.bin", cross, sizeof(float), SIZE);
+  write1d("data/decon_51.bin", decon, sizeof(float), SIZE);
+  write1d("data/alphas_51.bin", alphas, sizeof(float), SIZE);
 
-  write1d("data/cross_31.bin", cross, sizeof(float), SIZE);
-  write1d("data/alphas_31.bin", alphas, sizeof(float), SIZE);
+  plot1d_xy(alphas, l2, SIZE);
+  plot1d_xy(alphas, l1, SIZE);
+  plot1d_xy(alphas, cross, SIZE);
+  plot1d_xy(alphas, decon, SIZE);
+
+  free(alphas);
+  free(l2);
+  free(l1);
+  free(cross);
+  free(decon);
 
   return 0;
 }
-

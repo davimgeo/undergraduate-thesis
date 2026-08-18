@@ -21,44 +21,57 @@ static float get_epsilon(float complex*arr1, float complex*arr2, int size)
 
 static float* get_penalty(int nt, float dt, float t0)
 {
-  float* P = (float*)malloc(nt * sizeof(float));
+  float* P = malloc(nt * sizeof(float));
 
-  for (int i = 0; i < nt; ++i) 
+  for (int i = 0; i < nt; ++i)
   {
-    float tau = (i - (float)nt/2) * dt;
+    float tau;
 
-    if(fabs(tau) <= t0) {
+    if (i <= nt / 2)
+      tau = i * dt;
+    else
+      tau = (i - nt) * dt;
+
+    if (fabsf(tau) <= t0)
       P[i] = tau;
-    } else {
+    else
       P[i] = 0.0f;
-    }
-  }  
+  }
 
   return P;
 }
 
+
 static float* get_d_1d(
-  float* u_s, float* u_o,
-  float dt, int nt
+    float* u_s,
+    float* u_o,
+    float dt,
+    int nt
 )
 {
-  // IFFT( (conj(A) * B) / (conj(A) * A + eps) )
-  
-  float complex* C_u_o = conjugate1d(get_fft_1d(u_o, nt), nt); 
-  float complex* Im_u_o = get_fft_1d(u_o, nt);
-  float complex* Im_u_s = get_fft_1d(u_s, nt);
+  float complex* fft_u_o = get_fft_1d(u_o, nt);
+  float complex* fft_u_s = get_fft_1d(u_s, nt);
+  float complex* C_u_o = conjugate1d(fft_u_o, nt);
 
-  float complex* d = malloc(sizeof(float complex) * nt);
+  float complex* d = malloc((size_t)nt * sizeof(float complex));
 
-  float epsilon = get_epsilon(C_u_o, Im_u_o, nt);
-  for (int i = 0; i < nt; i++)
+  float epsilon = get_epsilon(C_u_o, fft_u_o, nt);
+
+  for (int i = 0; i < nt; ++i)
   {
-    d[i] = (C_u_o[i] * Im_u_s[i]) / ((C_u_o[i] * Im_u_o[i]) + epsilon);
+    float complex numerator = C_u_o[i] * fft_u_s[i];
+
+    float complex denominator = C_u_o[i] * fft_u_o[i] + epsilon;
+
+    d[i] = numerator / denominator;
   }
 
   float* result = get_ifft_1d(d, nt);
 
-  free(C_u_o); free(Im_u_o); free(Im_u_s); free(d);
+  free(fft_u_o);
+  free(fft_u_s);
+  free(C_u_o);
+  free(d);
 
   return result;
 }
@@ -90,24 +103,44 @@ float get_decon_1d(float *u_s, float *u_o, float dt, int nt, float t0)
   return (-0.5f * result);
 }
 
-static float* get_d_2d(float* u_s, float* u_o, float dt, int nt, int nrec)
+static float* get_d_2d(
+    float* u_s,
+    float* u_o,
+    float dt,
+    int nt,
+    int nrec
+)
 {
-  // IFFT( (conj(A) * B) / (conj(A) * A + eps) )
-  
-  float complex* fft_u_o = get_fft_2d(u_o, nt, nrec);
-  float complex* C_u_o   = conjugate2d(fft_u_o, nt, nrec);
-  float complex* Im_u_o  = get_fft_2d(u_o, nt, nrec);
-  float complex* Im_u_s  = get_fft_2d(u_s, nt, nrec);
+  float* result = malloc((size_t)nt * nrec * sizeof(float));
+  if (result == NULL) return NULL;
 
-  float complex* d = malloc(sizeof(float complex) * nt * nrec);
+  float* trace_s = malloc((size_t)nt * sizeof(float));
 
-  float epsilon = get_epsilon(C_u_o, Im_u_o, nt * nrec);
-  for (int i = 0; i < nt * nrec; i++)
-    d[i] = (C_u_o[i] * Im_u_s[i]) / ((C_u_o[i] * Im_u_o[i]) + epsilon);
+  float* trace_o = malloc((size_t)nt * sizeof(float));
 
-  float* result = get_ifft_2d(d, nt, nrec);
+  for (int rec = 0; rec < nrec; ++rec)
+  {
+    for (int t = 0; t < nt; ++t)
+    {
+      trace_s[t] = u_s[t * nrec + rec];
+      trace_o[t] = u_o[t * nrec + rec];
+    }
 
-  free(C_u_o); free(Im_u_o); free(Im_u_s); free(d);
+    float* d = get_d_1d(
+        trace_s,
+        trace_o,
+        dt,
+        nt
+    );
+
+    for (int tau = 0; tau < nt; ++tau)
+      result[tau * nrec + rec] = d[tau];
+
+    free(d);
+  }
+
+  free(trace_s);
+  free(trace_o);
 
   return result;
 }
@@ -141,5 +174,5 @@ float get_decon_2d(float *u_s, float *u_o, float dt, int nt, int nrec, float t0)
   free(d);
   free(P);
 
-  return (-0.5f * result);
+  return (0.5f * result);
 }

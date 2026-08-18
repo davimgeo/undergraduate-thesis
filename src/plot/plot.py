@@ -108,6 +108,23 @@ def plot1d(arr: np.ndarray) -> None:
   plt.tight_layout()
   plt.show()
 
+def plot1d_xy(x: np.ndarray, y: np.ndarray) -> None:
+  _, ax = plt.subplots(nrows=1, ncols=1, figsize=(12, 5))
+
+  ax.plot(x, y)
+  
+  plt.tight_layout()
+  plt.show()
+
+def plot1d_compare(arr: np.ndarray, arr2: np.ndarray) -> None:
+  _, ax = plt.subplots(nrows=1, ncols=1, figsize=(12, 5))
+
+  ax.plot(arr)
+  ax.plot(arr2)
+  
+  plt.tight_layout()
+  plt.show()
+
 def plot2d(arr: np.ndarray) -> None:
   _, ax = plt.subplots(nrows=1, ncols=1, figsize=(12, 5))
 
