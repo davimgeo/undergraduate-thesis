@@ -21,33 +21,21 @@ static float get_epsilon(float complex*arr1, float complex*arr2, int size)
 
 static float* get_penalty(int nt, float dt, float t0)
 {
-  float* P = malloc(nt * sizeof(float));
+  float* P = malloc(nt * sizeof(*P));
 
   for (int i = 0; i < nt; ++i)
   {
-    float tau;
+    int lag_index = (i <= nt / 2) ? i : i - nt;
 
-    if (i <= nt / 2)
-      tau = i * dt;
-    else
-      tau = (i - nt) * dt;
+    float tau = lag_index * dt / 2.0f;
 
-    if (fabsf(tau) <= t0)
-      P[i] = tau;
-    else
-      P[i] = 0.0f;
+    P[i] = (fabsf(tau) <= t0) ? tau : 0.0f;
   }
 
   return P;
 }
 
-
-static float* get_d_1d(
-    float* u_s,
-    float* u_o,
-    float dt,
-    int nt
-)
+static float* get_d_1d(float* u_s, float* u_o, float dt, int nt)
 {
   float complex* fft_u_o = get_fft_1d(u_o, nt);
   float complex* fft_u_s = get_fft_1d(u_s, nt);
@@ -87,7 +75,7 @@ float get_decon_1d(float *u_s, float *u_o, float dt, int nt, float t0)
   {
     //plot1d(P, nt);
     //plot1d(d, nt);
-    initialized = 1;
+    initialized = 0;
   }
 
   for (int tau = 0; tau < nt; ++tau) 
@@ -100,79 +88,6 @@ float get_decon_1d(float *u_s, float *u_o, float dt, int nt, float t0)
   free(d);
   free(P);
 
-  return (-0.5f * result);
+  return 0.5f * result;
 }
 
-static float* get_d_2d(
-    float* u_s,
-    float* u_o,
-    float dt,
-    int nt,
-    int nrec
-)
-{
-  float* result = malloc((size_t)nt * nrec * sizeof(float));
-  if (result == NULL) return NULL;
-
-  float* trace_s = malloc((size_t)nt * sizeof(float));
-
-  float* trace_o = malloc((size_t)nt * sizeof(float));
-
-  for (int rec = 0; rec < nrec; ++rec)
-  {
-    for (int t = 0; t < nt; ++t)
-    {
-      trace_s[t] = u_s[t * nrec + rec];
-      trace_o[t] = u_o[t * nrec + rec];
-    }
-
-    float* d = get_d_1d(
-        trace_s,
-        trace_o,
-        dt,
-        nt
-    );
-
-    for (int tau = 0; tau < nt; ++tau)
-      result[tau * nrec + rec] = d[tau];
-
-    free(d);
-  }
-
-  free(trace_s);
-  free(trace_o);
-
-  return result;
-}
-
-float get_decon_2d(float *u_s, float *u_o, float dt, int nt, int nrec, float t0)
-{
-  float result = 0.0f;
-
-  float* d = get_d_2d(u_s, u_o, dt, nt, nrec);
-  float* P = get_penalty(nt, dt, t0);
-
-  if(!initialized)
-  {
-    //plot1d(P, nt);
-    //plot1d(d, nt);
-    initialized = 1;
-  }
-
-  for (int tau = 0; tau < nt; ++tau)
-  {
-    for (int j = 0; j < nrec; ++j)
-    {
-      int idx = tau * nrec + j;
-
-      float pc = P[tau] * d[idx];
-
-      result += pc * pc;
-    }
-  }
-
-  free(d);
-  free(P);
-
-  return (0.5f * result);
-}

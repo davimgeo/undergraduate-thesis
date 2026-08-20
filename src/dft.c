@@ -10,7 +10,7 @@ float complex* computeDFT(int N, float* arr, float dt)
   #pragma omp parallel for schedule(static)
   for (int k = 0; k < N; k++)
   {
-    DFT[k] = 0.0f + 0.0f * I;
+    //DFT[k] = 0.0f + 0.0f * I;
 
     for (int n = 0; n < N; n++)
     {
@@ -25,21 +25,21 @@ float complex* computeDFT(int N, float* arr, float dt)
 
 float* computeIFFT(int N, float complex* X)
 {
-  float* x = malloc(sizeof(float) * N);
+  float* x = malloc(N * sizeof(*x));
 
   #pragma omp parallel for schedule(static)
-  for (int n = 0; n < N; n++)
+  for (int n = 0; n < N; ++n)
   {
-    x[n] = 0.0f;
+    float sum = 0.0f;
 
-    for (int k = 0; k < N; k++)
+    for (int k = 0; k < N; ++k)
     {
       float angle = 2.0f * PI * k * n / N;
 
-      float complex arg = X[k] * cexpf(I * angle) / (float)N;
-
-      x[n] += crealf(arg);
+      sum += crealf(X[k] * cexpf(I * angle));
     }
+
+    x[n] = sum / (float)N;
   }
 
   return x;

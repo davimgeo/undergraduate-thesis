@@ -1,149 +1,79 @@
 #include <complex.h>
+#include <math.h>
 #include <stdlib.h>
 
 #include "fft.h"
-#include "utils.h"
-
 #include "plot.h"
 
 static int initialized = 0;
 
-static float* get_penalty(int nt, float dt, float t0)
+static float* get_penalty(float tau0, int nt, float dt)
 {
-  float* P = malloc(nt * sizeof(float));
+  float* P = malloc(nt * sizeof(*P));
 
-  for (int i = 0; i < nt; ++i)
+  for (int itau = 0; itau < nt; ++itau)
   {
-    float tau;
+    int lag_index = (itau <= nt / 2) ? itau : itau - nt;
 
-    if (i <= nt / 2)
-      tau = i * dt;
-    else
-      tau = (i - nt) * dt;
+    float tau = lag_index * dt / 2.0f;
 
-    if (fabsf(tau) <= t0)
-      P[i] = tau;
-    else
-      P[i] = 0.0f;
+    P[itau] = (fabsf(tau) <= tau0) ? tau : 0.0f;
   }
 
   return P;
 }
 
-static float* get_c_1d(float* u_s, float* u_o, float dt, int nt)
+float* get_c_1d(const float* u_s, const float* u_o, int nt)
 {
-  // IFFT(conj(A) * B)
-  float complex* fft_u_s = get_fft_1d(u_s, nt);
-  float complex* C_u_s = conjugate1d(fft_u_s, nt); 
-  float complex* Im_u_o = get_fft_1d(u_o, nt);
+  float complex* U_s = get_fft_1d((float*)u_s, nt);
 
-  // cross correlation
-  float complex* cross = malloc(sizeof(float complex) * nt);
-  for (int i = 0; i < nt; i++) cross[i] = C_u_s[i] * Im_u_o[i];
+  float complex* U_o = get_fft_1d((float*)u_o, nt);
 
-  float* result = get_ifft_1d(cross, nt);
+  float complex* cross = malloc(nt * sizeof(*cross));
 
-  free(fft_u_s); free(C_u_s); free(Im_u_o); free(cross);
-
-  return result;
-}
-
-float get_cross_1d(float *u_s, float *u_o, float dt, int nt, float t0)
-{
-  // H_cor = 0.5 * sum(P(tau) * c)
-  float result = 0.0f;
-
-  float* c = get_c_1d(u_s, u_o, dt, nt);
-  float* P = get_penalty(nt, dt, t0);
-
-  if(!initialized)
+  for (int iw = 0; iw < nt; ++iw)
   {
-    //plot1d(P, nt);
-    //plot1d(c_shift, nt);
-    initialized = 1;
+    cross[iw] = conjf(U_o[iw]) * U_s[iw];
   }
 
-  for (int tau = 0; tau < nt; ++tau) 
-  {
-    float pc = P[tau] * c[tau];
+  float* c = get_ifft_1d(cross, nt);
 
-    result += pc * pc;
-  }
+  free(U_s);
+  free(U_o);
+  free(cross);
 
-  free(c); free(P);
-
-  return (-0.5f * result);
+  return c;
 }
 
-float* get_c_2d(
+float get_cross_1d(
     float* u_s,
     float* u_o,
     float dt,
     int nt,
-    int nrec
+    float tau0
 )
 {
-  float* result = malloc((size_t)nt * nrec * sizeof(float));
-  if (result == NULL) return NULL;
+  float* P = get_penalty(tau0, nt, dt);
 
-  float* trace_s = (float*)malloc(nt * sizeof(float));
-  float* trace_o = (float*)malloc(nt * sizeof(float));
+  float* c = get_c_1d(u_s, u_o, nt);
 
-  for (int rec = 0; rec < nrec; ++rec)
-  {
-
-    for (int t = 0; t < nt; ++t)
-    {
-      trace_s[t] = u_s[t * nrec + rec];
-      trace_o[t] = u_o[t * nrec + rec];
-    }
-
-    float* c = get_c_1d(
-        trace_s,
-        trace_o,
-        dt,
-        nt
-    );
-
-    for (int tau = 0; tau < nt; ++tau) result[tau * nrec + rec] = c[tau];
-
-    free(c);
-  }
-
-  free(trace_s);
-  free(trace_o);
-
-  return result;
-}
-
-float get_cross_2d(float *u_s, float *u_o, float dt, int nt, int nrec, float t0)
-{
-  // H_cor = 0.5 * sum(P(tau) * c)
-  float result = 0.0f;
-
-  float* c = get_c_2d(u_s, u_o, dt, nt, nrec);
-  float* P = get_penalty(nt, dt, t0);
+  double result = 0.0;
 
   if(!initialized)
   {
     //plot1d(P, nt);
-    //plot2d(c, nt, nrec);
     initialized = 1;
   }
 
-  for (int tau = 0; tau < nt; ++tau)
+  for (int itau = 0; itau < nt; ++itau)
   {
-    for (int j = 0; j < nrec; ++j)
-    {
-      int idx = tau * nrec + j;
+    double pc = (double)P[itau] * (double)c[itau];
 
-      float pc = P[tau] * c[idx];
-
-      result += pc * pc;
-    }
+    result += pc * pc;
   }
 
-  free(c); free(P);
+  free(P);
+  free(c);
 
-  return (0.5f * result);
+  return (float)(0.5 * result);
 }

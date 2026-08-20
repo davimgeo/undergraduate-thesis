@@ -8,9 +8,11 @@
 #include "decon_objf.h"
 
 float* moving_rickers_l1(
-  float* wavelet,
+  float* u_o,
   int nt,
-  int result_size
+  int result_size,
+  float fmax,
+  float dt
 )
 {
   float* result = (float*)malloc(result_size * sizeof(float));
@@ -21,13 +23,13 @@ float* moving_rickers_l1(
   {
     float* ricker_phase = get_ricker(
       nt,
-      30.0f,
-      1e-3f,
+      fmax,
+      dt,
       phase
     );
 
     result[i] = l1_norm_1d(
-      wavelet,
+      u_o,
       ricker_phase,
       nt
     );
@@ -43,9 +45,11 @@ float* moving_rickers_l1(
 }
 
 float* moving_rickers_l2(
-  float* wavelet,
+  float* u_o,
   int nt,
-  int result_size
+  int result_size,
+  float fmax,
+  float dt
 )
 {
   float* result = (float*)malloc(result_size * sizeof(float));
@@ -56,13 +60,13 @@ float* moving_rickers_l2(
   {
     float* ricker_phase = get_ricker(
       nt,
-      30.0f,
-      1e-3f,
+      fmax,
+      dt,
       phase
     );
 
     result[i] = l2_norm_1d(
-      wavelet,
+      u_o,
       ricker_phase,
       nt
     );
@@ -86,11 +90,11 @@ float* moving_rickers_cross(
   float t0
 )
 {
-  float* result = (float*)malloc(result_size * sizeof(float));
+  float* result = malloc(result_size * sizeof(*result));
 
   float phase = 0.0f;
 
-  for (int i = 0; i < result_size; i++)
+  for (int i = 0; i < result_size; ++i)
   {
     float* u_s = get_ricker(
       nt,
@@ -99,13 +103,15 @@ float* moving_rickers_cross(
       phase
     );
 
-    result[i] = get_cross_1d(
+    float cross = get_cross_1d(
       u_s,
       u_o,
       dt,
       nt,
       t0
     );
+
+    result[i] = cross;
 
     phase += 0.7f / result_size;
 

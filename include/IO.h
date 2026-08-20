@@ -33,6 +33,24 @@ static inline void write2d(
   fclose(bin_data);   
 }
 
+static inline float* read1d(const char* PATH, int size) 
+{
+  float* arr = (float*)malloc(size*sizeof(float));
+
+  FILE* bin_data = fopen(PATH, "rb"); 
+  if (bin_data == NULL) 
+  {
+      printf("Could not read binary file.\n");
+      exit(-1);
+  }
+
+  fread(arr, sizeof(float), size, bin_data); 
+
+  fclose(bin_data);   
+
+  return arr;
+}
+
 static inline float* read2d(const char* PATH, int row, int column) 
 {
   float* arr = (float*)malloc(row*column*sizeof(float));

@@ -51,7 +51,8 @@ float* fftshift(float* x, int N)
 {
   float* y = (float*)malloc(N * sizeof(float));
 
-  int shift = N / 2;
+  //int shift = N / 2;
+  int shift = (N + 1) / 2;
 
   for(int i = 0; i < N; i++) 
     y[i] = x[(i + shift) % N];
