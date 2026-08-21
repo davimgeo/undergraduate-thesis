@@ -1,6 +1,6 @@
 #include <stdlib.h>
 #include <propagation.h>
-//#include "cross.objf.h"
+#include "cross.objf.h"
 #include "decon_objf.h"
 #include "euclidian.h"
 #include "geometry.h"
@@ -8,7 +8,6 @@
 #include "config/config.h"
 #include "plot.h"
 #include "IO.h"
-#include "cross_obj_zhang.h"
 
 #define V0          2000.0f
 #define REF_ALPHA   2.0f
@@ -146,7 +145,7 @@ int main()
     l2[i] = l2_norm_2d(dcalc, dobs, nt, nrec);
     l1[i] = l1_norm_2d(dcalc, dobs, nt, nrec);
 
-    cross[i] = get_cross_zhang_1d(
+    cross[i] = get_cross_1d(
       dcalc, dobs, seis_grad->dt, nt, T0
     );
 
@@ -166,6 +165,12 @@ int main()
   normalize(decon, SIZE);
 
   PROFILE_END();
+
+  write1d("data/l2_51.bin", l2, sizeof(float), SIZE);
+  write1d("data/l1_51.bin", l1, sizeof(float), SIZE);
+  write1d("data/cross_51.bin", cross, sizeof(float), SIZE);
+  write1d("data/decon_51.bin", decon, sizeof(float), SIZE);
+  write1d("data/alphas_51.bin", alphas, sizeof(float), SIZE);
 
   plot1d_xy(alphas, l2, SIZE);
   plot1d_xy(alphas, l1, SIZE);

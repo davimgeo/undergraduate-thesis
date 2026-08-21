@@ -16,7 +16,7 @@ static float get_epsilon(float complex*arr1, float complex*arr2, int size)
     float temp = cabsf(arr1[i] * arr2[i]);
     if (temp > max) max = temp;
   }
-  return 0.05f * max;
+  return 0.01f * max;
 }
 
 static float* get_penalty(int nt, float dt, float t0)
@@ -71,6 +71,8 @@ float get_decon_1d(float *dcalc, float *dobs, float dt, int nt, float t0)
   float* d = get_d_1d(dcalc, dobs, dt, nt);
   float* P = get_penalty(nt, dt, t0);
 
+  float w = 0.0f;
+
   if(!initialized)
   {
     //plot1d(P, nt);
@@ -82,12 +84,13 @@ float get_decon_1d(float *dcalc, float *dobs, float dt, int nt, float t0)
   {
     float pc = P[tau] * d[tau];
 
+    w      += d[tau] * d[tau];
     result += pc * pc;
   }
 
   free(d);
   free(P);
 
-  return 0.5f * result;
+  return 0.5f * (result / w);
 }
 
