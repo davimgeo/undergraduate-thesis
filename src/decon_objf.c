@@ -16,7 +16,7 @@ static float get_epsilon(float complex*arr1, float complex*arr2, int size)
     float temp = cabsf(arr1[i] * arr2[i]);
     if (temp > max) max = temp;
   }
-  return 0.01f * max;
+  return 0.05f * max;
 }
 
 static float* get_penalty(int nt, float dt, float t0)
@@ -45,13 +45,13 @@ float* get_d_1d(float* dcalc, float* dobs, float dt, int nt)
 
   float epsilon = get_epsilon(C_u_o, fft_u_o, nt);
 
-  for (int i = 0; i < nt; ++i)
+  for (int iw = 0; iw < nt; ++iw)
   {
-    float complex numerator = C_u_o[i] * fft_u_s[i];
+    float complex numerator = C_u_o[iw] * fft_u_s[iw];
 
-    float complex denominator = C_u_o[i] * fft_u_o[i] + epsilon;
+    float complex denominator = C_u_o[iw] * fft_u_o[iw] + epsilon;
 
-    d[i] = numerator / denominator;
+    d[iw] = numerator / denominator;
   }
 
   float* result = get_ifft_1d(d, nt);
