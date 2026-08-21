@@ -11,8 +11,8 @@ SpecsContext* Specs_Init(SpecsContext* specs)
     .wavelet =
     {
       .dt = 1e-3f,
-      .fmax = 50.0f,
-      .nt = 4001
+      .fmax = 30.0f,
+      .nt = 2001
     },
 
     .geometry =
@@ -29,7 +29,7 @@ SpecsContext* Specs_Init(SpecsContext* specs)
     .model =
     {
       .nx = 201,
-      .nz = 401,
+      .nz = 201,
       .nb = 100,
 
       .interfaces_size = 1,
@@ -40,13 +40,13 @@ SpecsContext* Specs_Init(SpecsContext* specs)
 
     .seismogram =
     {
-      .nt = 4001,
+      .nt = 2001,
       .dt = 1e-3f
     },
 
     .propagation =
     {
-      .nt = 4001,
+      .nt = 2001,
       .dt = 1e-3f,
       .dh = 10,
 
