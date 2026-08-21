@@ -5,6 +5,8 @@
 #include "fft.h"
 #include "plot.h"
 
+#define M_PI 3.14159265f
+
 static int initialized = 0;
 
 static float* get_penalty(float tau0, int nt, float dt)
@@ -26,15 +28,25 @@ static float* get_penalty(float tau0, int nt, float dt)
 float* get_c_1d(const float* u_s, const float* u_o, int nt)
 {
   float complex* U_s = get_fft_1d((float*)u_s, nt);
-
   float complex* U_o = get_fft_1d((float*)u_o, nt);
 
   float complex* cross = malloc(nt * sizeof(*cross));
 
+  float energy_s = 0.0f; float energy_o = 0.0f;
+
   for (int iw = 0; iw < nt; ++iw)
   {
-    cross[iw] = conjf(U_o[iw]) * U_s[iw];
+    cross[iw] = U_o[iw] * conjf(U_s[iw]);
+
+    energy_s += crealf(U_s[iw] * conjf(U_s[iw]));
+    energy_o += crealf(U_o[iw] * conjf(U_o[iw]));
   }
+
+  float denominator = sqrtf(energy_s * energy_o) / nt;
+
+  if (denominator > 0.0f)
+    for (int iw = 0; iw < nt; ++iw)
+      cross[iw] /= denominator;
 
   float* c = get_ifft_1d(cross, nt);
 
@@ -46,18 +58,17 @@ float* get_c_1d(const float* u_s, const float* u_o, int nt)
 }
 
 float get_cross_1d(
-    float* u_s,
-    float* u_o,
+    const float* u_s,
+    const float* u_o,
     float dt,
     int nt,
     float tau0
 )
 {
   float* P = get_penalty(tau0, nt, dt);
-
   float* c = get_c_1d(u_s, u_o, nt);
 
-  double result = 0.0;
+  float result = 0.0;
 
   if(!initialized)
   {
@@ -67,13 +78,12 @@ float get_cross_1d(
 
   for (int itau = 0; itau < nt; ++itau)
   {
-    double pc = (double)P[itau] * (double)c[itau];
+    float pc = P[itau] * c[itau];
 
     result += pc * pc;
   }
 
   free(P);
-  free(c);
 
-  return (float)(0.5 * result);
+  return (0.5 * result);
 }

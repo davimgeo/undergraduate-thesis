@@ -35,10 +35,10 @@ static float* get_penalty(int nt, float dt, float t0)
   return P;
 }
 
-static float* get_d_1d(float* u_s, float* u_o, float dt, int nt)
+float* get_d_1d(float* dcalc, float* dobs, float dt, int nt)
 {
-  float complex* fft_u_o = get_fft_1d(u_o, nt);
-  float complex* fft_u_s = get_fft_1d(u_s, nt);
+  float complex* fft_u_o = get_fft_1d(dobs, nt);
+  float complex* fft_u_s = get_fft_1d(dcalc, nt);
   float complex* C_u_o = conjugate1d(fft_u_o, nt);
 
   float complex* d = malloc((size_t)nt * sizeof(float complex));
@@ -64,30 +64,33 @@ static float* get_d_1d(float* u_s, float* u_o, float dt, int nt)
   return result;
 }
 
-float get_decon_1d(float *u_s, float *u_o, float dt, int nt, float t0)
+float get_decon_1d(float *dcalc, float *dobs, float dt, int nt, float t0)
 {
   float result = 0.0f;
 
-  float* d = get_d_1d(u_s, u_o, dt, nt);
+  float* d = get_d_1d(dcalc, dobs, dt, nt);
   float* P = get_penalty(nt, dt, t0);
+
+  float w = 0.0f;
 
   if(!initialized)
   {
     //plot1d(P, nt);
     //plot1d(d, nt);
-    initialized = 0;
+    initialized = 1;
   }
 
   for (int tau = 0; tau < nt; ++tau) 
   {
     float pc = P[tau] * d[tau];
 
+    w      += d[tau] * d[tau];
     result += pc * pc;
   }
 
   free(d);
   free(P);
 
-  return 0.5f * result;
+  return 0.5f * (result / w);
 }
 
