@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 
 SIZE = 51
 
-REF_ALPHA = 3.5
+REF_ALPHA = 2.0
 
 alphas = np.fromfile("data/alphas_51.bin", dtype=np.float32, count=SIZE)
 da     = alphas - REF_ALPHA

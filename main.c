@@ -3,6 +3,7 @@
 #include "cross.objf.h"
 #include "decon_objf.h"
 #include "euclidian.h"
+#include "fft.h"
 #include "geometry.h"
 #include "utils.h"
 #include "config/config.h"
@@ -81,8 +82,8 @@ int main()
   SpecsContext* specs = Specs_Init(NULL);
 
   geometry_t* geom = Geometry_InitCreate(NULL, &specs->geometry);
-  //Geometry_Create(geom, 0);
-  Geometry_SetReceiver(geom, 101, 0);
+  Geometry_Create(geom, GEOMETRY_ONLYRECEIVERS);
+  //Geometry_SetReceiver(geom, 101, 0);
   Geometry_SetSource(geom, 101, 50);
 
   wavelet_t* wave = Wavelet_Init(NULL, &specs->wavelet);
@@ -145,12 +146,12 @@ int main()
     l2[i] = l2_norm_2d(dcalc, dobs, nt, nrec);
     l1[i] = l1_norm_2d(dcalc, dobs, nt, nrec);
 
-    cross[i] = get_cross_1d(
-      dcalc, dobs, seis_grad->dt, nt, T0
+    cross[i] = get_cross_2d(
+      dcalc, dobs, seis_grad->dt, nt, geom->nrec, T0
     );
 
-    decon[i] = get_decon_1d(
-      dcalc, dobs, seis_grad->dt, nt, T0
+    decon[i] = get_decon_2d(
+      dcalc, dobs, seis_grad->dt, nt, geom->nrec, T0
     );
 
     printf("Alpha: %g | L2: %g | L1: %g | Cross: %g | Decon: %g\n",

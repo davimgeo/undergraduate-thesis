@@ -17,7 +17,7 @@ static float* get_penalty(float tau0, int nt, float dt)
   {
     int lag_index = (itau <= nt / 2) ? itau : itau - nt;
 
-    float tau = lag_index * dt / 2.0f;
+    float tau = lag_index * dt;
 
     P[itau] = (fabsf(tau) <= tau0) ? tau : 0.0f;
   }
@@ -86,4 +86,76 @@ float get_cross_1d(
   free(P);
 
   return (0.5 * result);
+}
+
+float* get_c_2d(
+  const float* u_s,
+  const float* u_o,
+  int nt,
+  int nrec
+)
+{
+  float* c_2d = malloc(nt * nrec * sizeof(*c_2d));
+
+  float* trace_s = malloc(nt * sizeof(*trace_s));
+  float* trace_o = malloc(nt * sizeof(*trace_o));
+
+  for (int irec = 0; irec < nrec; ++irec) 
+  {
+    for (int t = 0; t < nt; ++t) 
+    {
+      int idx = t * nrec + irec;
+
+      trace_s[t] = u_s[idx];
+      trace_o[t] = u_o[idx];
+    }
+
+    float* c_1d = get_c_1d(trace_s, trace_o, nt);
+
+    for (int itau = 0; itau < nt; ++itau) 
+    {
+      int idx = itau * nrec + irec;
+
+      c_2d[idx] = c_1d[itau];
+    }
+
+    free(c_1d);
+  }
+
+  free(trace_s);
+  free(trace_o);
+
+  return c_2d;
+}
+
+float get_cross_2d(
+  const float* u_s,
+  const float* u_o,
+  float dt,
+  int nt,
+  int nrec,
+  float tau0 
+)
+{
+  float* P = get_penalty(tau0, nt, dt);
+  float* c = get_c_2d(u_s, u_o, nt, nrec);
+
+  float result = 0.0f;
+
+  for (int irec = 0; irec < nrec; ++irec) 
+  {
+    for (int itau = 0; itau < nt; ++itau)
+    {
+      int idx = itau * nrec + irec;
+
+      float pc = P[itau] * c[idx];
+
+      result += pc * pc;
+    }
+  }
+
+  free(P);
+  free(c);
+
+  return 0.5f * result;
 }
