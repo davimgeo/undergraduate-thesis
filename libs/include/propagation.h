@@ -1,18 +1,10 @@
 #pragma once
 
-// TODO: remove it after making lib
-// not necessary, just used here
-// to transform the project into a 
-// static lib
-#include "geometry.h"
-#include "model.h"
-#include "wavelet.h"
-#include "seismogram.h"
-
-#define PROPAGATION_SAVE_SNAPSHOTS  (1U << 0)
-#define PROPAGATION_SAVE_SEISMOGRAM (1U << 1)
-#define PROPAGATION_ACOUSTIC        (1U << 2)
-#define PROPAGATION_ELASTIC         (1U << 3)
+#define PROPAGATION_SAVE_SNAPSHOTS     (1U << 0)
+#define PROPAGATION_SAVE_SEISMOGRAM    (1U << 1)
+#define PROPAGATION_ACOUSTIC           (1U << 2)
+#define PROPAGATION_ELASTIC            (1U << 3)
+#define PROPAGATION_HOMOGENOUS         (1U << 4)
 
 typedef struct propagation_t propagation_t;
 
@@ -39,5 +31,18 @@ propagation_t *Propagation_Init(
   unsigned flags
 );
 
+void Propagation_Destroy(propagation_t *p);
+
 void Propagation_Run(propagation_t *p, unsigned flags);
+
+void Propagation_VelocityUpdate(propagation_t *p, const float* vel_args);
+
 void Propagation_GetDamp(propagation_t *p);
+
+void Propagation_GetSeismogram(propagation_t *p, float * seismogram, int t);
+
+void Propagation_InjectSource(propagation_t *p, int sidx, int t);
+
+void Propagation_InjectSeismogram(propagation_t *p, int t);
+
+

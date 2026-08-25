@@ -1,9 +1,9 @@
-#ifndef GEOMETRY_H
-#define GEOMETRY_H
+#pragma once
 
 #include <stdio.h>
 
-#define GEOMETRY_ONLYRECEIVERS (1U << 0)
+#define GEOMETRY_ONLY_RECEIVERS (1U << 0)
+#define GEOMETRY_VERBOSE        (1U << 1)
 
 typedef struct
 {
@@ -24,6 +24,8 @@ typedef struct
   int rec_depth;
   int offset_rec;
   int offset_src;
+
+  int dh;
 } geometry_specs_t;
 
 typedef struct geometry_t
@@ -52,9 +54,8 @@ void Geometry_Load(
   const char* SRC_PATH
 );
 
-void Geometry_SetSource(geometry_t* geom, int sx, int sz);
 void Geometry_SetReceiver(geometry_t* geom, int rx, int rz);
+void Geometry_SetSource(geometry_t* geom, int sx, int sz);
 void Geometry_Create(geometry_t *geom, unsigned flags);
-
-#endif /* end of include guard: GEOMETRY_H */
+void Geometry_Destroy(geometry_t* geom);
 

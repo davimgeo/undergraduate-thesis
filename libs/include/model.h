@@ -40,10 +40,12 @@ typedef struct model_t
 
 model_t* Model_Init(model_t *m, model_specs_t* specs);
 void Model_Load(model_t *m, const char* PATH, int nx, int nz);
-void Model_Set(model_t* m, float* vp);
+void Model_Set(model_t*m, float* vp);
 void Model_Create(model_t* m);
 void Model_CreateElastic(model_t* m);
 void Model_Extent(model_t *m);
 void Model_ExtentElastic(model_t *m);
+
+void Model_Destroy(model_t *m);
 
 #endif 
