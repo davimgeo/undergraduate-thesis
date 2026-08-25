@@ -68,7 +68,6 @@ float* get_dobs(
     seis,
     PROPAGATION_ACOUSTIC
   );
-  Propagation_GetDamp(prop);
   Propagation_Run(prop, 0);
 
   float* dobs = seis->seismogram;
@@ -84,7 +83,7 @@ int main()
   geometry_t* geom = Geometry_InitCreate(NULL, &specs->geometry);
   Geometry_Create(geom, GEOMETRY_ONLY_RECEIVERS);
   //Geometry_SetReceiver(geom, 101, 0);
-  Geometry_SetSource(geom, 101, 30);
+  Geometry_SetSource(geom, 101, 50);
 
   wavelet_t* wave = Wavelet_Init(NULL, &specs->wavelet);
   Wavelet_Create(wave);
@@ -132,8 +131,6 @@ int main()
       NULL, &specs->propagation, grad_model_obj, geom,
       wave, seis_grad, PROPAGATION_ACOUSTIC
     );
-
-    Propagation_GetDamp(prop_grad);
     Propagation_Run(prop_grad, 0);
 
     if(i == 1) plot_model_geometry(grad_model_obj, 10, geom);
@@ -186,5 +183,7 @@ int main()
 
   return 0;
 }
+
+
 
 

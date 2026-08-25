@@ -164,9 +164,10 @@ float get_decon_2d(
       w      += d[idx] * d[idx];
     }
 
-    if (w > 0.0f)
-      total += 0.5f * result / w;
+    if (w > 0.0f) total += 0.5f * result / w;
   }
+  free(P);
+  free(d);
 
   return total / nrec;
 }

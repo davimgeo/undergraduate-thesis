@@ -12,18 +12,19 @@ SpecsContext* Specs_Init(SpecsContext* specs)
     {
       .dt = 1e-3f,
       .fmax = 30.0f,
-      .nt = 2001
+      .nt = 2001,
+      .tlag = 0.15,
     },
 
     .geometry =
     {
       .line_length = 201,
 
-      .src_depth = 10,
-      .rec_depth = 8,
+      .src_depth = 40,
+      .rec_depth = 0,
 
       .offset_rec = 10,
-      .offset_src = 100
+      .offset_src = 50
     },
 
     .model =
