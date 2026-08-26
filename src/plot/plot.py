@@ -88,10 +88,16 @@ def plot_model_geometry(
     vmin=vmin, vmax=vmax
   )
 
-  ax.plot(recx, recz, 'gv', label="Receivers", markersize=12)
-  ax.plot(srcx, srcz, 'r*', markersize=12, label="Source")
+  ax.plot(recx, recz / dh, 'gv', label="Receivers", markersize=12)
+  ax.plot(srcx, srcz / dh, 'r*', markersize=12, label="Source")
 
   plt.colorbar(img, ax=ax, label="VP [m/s]")
+
+  ax.set_yticks(zloc)
+  ax.set_yticklabels(zlab)
+
+  ax.set_xticks(xloc)
+  ax.set_xticklabels(xlab)
 
   ax.set_xlabel("Distance [m]", fontsize=13)
   ax.set_ylabel("Depth [m]", fontsize=13)

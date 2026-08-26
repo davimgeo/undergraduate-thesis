@@ -1,6 +1,7 @@
 #include <math.h>
 #include <stdlib.h>
 
+#include "plot.h"
 #include "utils.h"
 #include "ricker.h"
 
@@ -15,19 +16,26 @@ float l1_norm_1d(float* A, float* B, int size)
   return result;
 }
 
-float l1_norm_2d(float* A, float* B, int row, int col)
+float l1_norm_2d(
+  const float* u_s,
+  const float* u_o,
+  int nt,
+  int nrec
+)
 {
   float result = 0.0f;
-  for (int i = 0; i < row; i++) 
+
+  for (int irec = 0; irec < nrec; ++irec)
   {
-    for (int j = 0; j < col; j++) 
+    for (int t = 0; t < nt; ++t)
     {
-      int idx = i * col + j;
-      result += fabsf(A[idx] - B[idx]);
+      int idx = t * nrec + irec;
+
+      result += fabsf(u_s[idx] - u_o[idx]);
     }
   }
 
-  return result;
+  return 0.5f * result;
 }
 
 float l2_norm_1d(float* A, float* B, int size)
@@ -38,7 +46,31 @@ float l2_norm_1d(float* A, float* B, int size)
     result += (A[i] - B[i]) * (A[i] - B[i]);
   }
 
-  return sqrtf(result);
+  return 0.5f * result;
+}
+
+float l2_squared_norm_2d(
+  const float* u_s,
+  const float* u_o,
+  int nt,
+  int nrec
+)
+{
+  float result = 0.0f;
+
+  for (int irec = 0; irec < nrec; ++irec)
+  {
+    for (int t = 0; t < nt; ++t)
+    {
+      int idx = t * nrec + irec;
+
+      float r = u_s[idx] - u_o[idx];
+
+      result += r * r;
+    }
+  }
+
+  return 0.5f * result;
 }
 
 float l2_norm_2d(float* A, float* B, int row, int col)
@@ -52,42 +84,6 @@ float l2_norm_2d(float* A, float* B, int row, int col)
       result += (A[idx] - B[idx]) * (A[idx] - B[idx]);
     }
   }
-  return sqrtf(result);
-}
-
-
-float* get_l1_result(
-  float* wavelet,
-  int nt,
-  int result_size
-)
-{
-  float* result = (float*)malloc(result_size * sizeof(float));
-
-  float phase = 0.0f;
-
-  for (int i = 0; i < result_size; i++)
-  {
-    float* ricker_phase = get_ricker(
-      nt,
-      30.0f,
-      1e-3f,
-      phase
-    );
-
-    result[i] = l1_norm_1d(
-      wavelet,
-      ricker_phase,
-      nt
-    );
-
-    phase += 0.7f / result_size;
-
-    free(ricker_phase);
-  }
-
-  normalize(result, result_size);
-
-  return result;
+  return sqrt(result);
 }
 

@@ -7,7 +7,6 @@
 #include "cross.objf.h"
 #include "decon_objf.h"
 #include "euclidian.h"
-#include "fft.h"
 #include "geometry.h"
 #include "IO.h"
 #include "plot.h"
@@ -82,7 +81,6 @@ static float* get_dobs(SpecsContext* specs, geometry_t* geom, wavelet_t* wave)
   if (base_model == NULL) return NULL;
 
   model_t* model = Model_Init(NULL, &specs->model);
-
   Model_Set(model, base_model);
   Model_Extent(model);
 
@@ -131,9 +129,9 @@ int main(void)
   geometry_t* geom = Geometry_InitCreate(NULL, &specs->geometry);
 
   Geometry_Create(geom, GEOMETRY_ONLY_RECEIVERS);
-  Geometry_SetSource(geom, 101, 20);
-  Geometry_SetSource(geom, 151, 20);
-  Geometry_SetSource(geom, 51, 20);
+  Geometry_SetSource(geom, 101, 50);
+  //Geometry_SetSource(geom, 151, 20);
+  //Geometry_SetSource(geom, 51, 20);
 
   wavelet_t* wave = Wavelet_Init(NULL, &specs->wavelet);
   Wavelet_Create(wave);
@@ -141,11 +139,11 @@ int main(void)
   float* dobs = get_dobs(specs, geom, wave);
   if (dobs == NULL) return -1;
 
-  float* alphas = malloc(SIZE * sizeof(float));
-  float* l2 = malloc(SIZE * sizeof(float));
-  float* l1 = malloc(SIZE * sizeof(float));
-  float* cross = malloc(SIZE * sizeof(float));
-  float* decon = malloc(SIZE * sizeof(float));
+  float* alphas = calloc(SIZE, sizeof(float));
+  float* l2 = calloc(SIZE, sizeof(float));
+  float* l1 = calloc(SIZE, sizeof(float));
+  float* cross = calloc(SIZE, sizeof(float));
+  float* decon = calloc(SIZE, sizeof(float));
 
   if (alphas == NULL || l2 == NULL || l1 == NULL || cross == NULL ||
       decon == NULL)
@@ -173,7 +171,6 @@ int main(void)
     if (grad_model == NULL) return -1;
 
     model_t* grad_model_obj = Model_Init(NULL, &specs->model);
-
     Model_Set(grad_model_obj, grad_model);
     Model_Extent(grad_model_obj);
 
@@ -220,6 +217,9 @@ int main(void)
       );
     }
 
+    cross[i] /= geom->nsrc;
+    decon[i] /= geom->nsrc;
+      
     if (i == 1) plot_model_geometry(grad_model_obj, 10, geom);
     if (i == SIZE - 1) plot_model_geometry(grad_model_obj, 10, geom);
 
@@ -260,6 +260,8 @@ int main(void)
 
   return 0;
 }
+
+
 
 
 

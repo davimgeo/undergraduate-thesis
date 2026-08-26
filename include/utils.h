@@ -80,4 +80,10 @@ static inline void normalize(float* result, int result_size)
   }
 }
 
+static inline void print1D(float* arr, int size)
+{
+  for (int i = 0; i < size; ++i) 
+    printf("\n%f ", arr[i]);
+}
+
 #endif // UTILS_H

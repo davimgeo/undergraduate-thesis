@@ -1,7 +1,7 @@
 import numpy as np 
 import matplotlib.pyplot as plt 
 
-SIZE = 51
+SIZE = 201
 
 REF_ALPHA = 2.0
 
