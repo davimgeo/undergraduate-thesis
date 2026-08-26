@@ -18,3 +18,13 @@ int plot1d(float* arr, int size);
 int plot1d_compare(float* arr, float* arr2, int size);
 int plot1d_xy(float* arr, float* arr2, int size);
 int plot2d(float* arr, int row, int col);
+int plot3d(float* arr, float* x, float* y, int row, int col);
+int contourplot(
+  float* arr,
+  int row,
+  int col,
+  float xmin,
+  float xmax,
+  float ymin,
+  float ymax
+);

@@ -215,7 +215,6 @@ int plot_model_geometry(model_t* model, int dh, geometry_t* geometry)
     NPY_FLOAT32,
     (void *)m->vp
   );
-
   if (err_py(py_model) != 0) goto cleanup;
 
   npy_intp rec_dims[1] = {g->nrec};
@@ -226,7 +225,6 @@ int plot_model_geometry(model_t* model, int dh, geometry_t* geometry)
       NPY_FLOAT32,
       (void *)g->rec.x
   );
-
   if (err_py(py_recx) != 0) goto cleanup;
 
   py_recz = PyArray_SimpleNewFromData(
@@ -235,7 +233,6 @@ int plot_model_geometry(model_t* model, int dh, geometry_t* geometry)
       NPY_FLOAT32,
       (void *)g->rec.z
   );
-
   if (err_py(py_recz) != 0) goto cleanup;
 
   npy_intp src_dims[1] = {g->nsrc};
@@ -246,7 +243,6 @@ int plot_model_geometry(model_t* model, int dh, geometry_t* geometry)
       NPY_FLOAT32,
       (void *)g->src.x
   );
-
   if (err_py(py_srcx) != 0) goto cleanup;
 
   py_srcz = PyArray_SimpleNewFromData(
@@ -255,15 +251,12 @@ int plot_model_geometry(model_t* model, int dh, geometry_t* geometry)
       NPY_FLOAT32,
       (void *)g->src.z
   );
-
   if (err_py(py_srcz) != 0) goto cleanup;
 
   py_nb = PyLong_FromLong(m->nb);
-
   if (err_py(py_nb) != 0) goto cleanup;
 
   py_dh = PyLong_FromLong(dh);
-
   if (err_py(py_dh) != 0) goto cleanup;
 
   args = PyTuple_Pack(
@@ -276,7 +269,6 @@ int plot_model_geometry(model_t* model, int dh, geometry_t* geometry)
       py_srcx,
       py_srcz
   );
-
   if (err_py(args) != 0) goto cleanup;
 
   status = plot_python_call("plot_model_geometry", args);
@@ -437,6 +429,124 @@ int plot2d(float* arr, int row, int col)
 
 cleanup:
   Py_XDECREF(args);
+  Py_XDECREF(py_arr);
+
+  return status;
+}
+
+int plot3d(float* arr, float* x, float* y, int row, int col)
+{
+  int status = -1;
+
+  PyObject *py_arr   = NULL;
+  PyObject *py_x     = NULL;
+  PyObject *py_y     = NULL;
+  PyObject *args     = NULL;
+
+  if (plot_python_init() != 0) goto cleanup;
+
+  npy_intp dims[2] = {row, col};
+
+  py_arr = PyArray_SimpleNewFromData(
+    2,
+    dims,
+    NPY_FLOAT32,
+    arr
+  );
+  if (err_py(py_arr) != 0) goto cleanup;
+
+  npy_intp coord_dims[1] = {row};
+
+  py_x = PyArray_SimpleNewFromData(
+    1,
+    coord_dims,
+    NPY_FLOAT32,
+    x
+  );
+  if (err_py(py_x) != 0) goto cleanup;
+
+  py_y = PyArray_SimpleNewFromData(
+    1,
+    coord_dims,
+    NPY_FLOAT32,
+    y
+  );
+  if (err_py(py_y) != 0) goto cleanup;
+
+  args = PyTuple_Pack(3, py_arr, py_x, py_y);
+  if (err_py(args) != 0) goto cleanup;
+
+  status = plot_python_call("plot3d", args);
+
+cleanup:
+  Py_XDECREF(args);
+  Py_XDECREF(py_arr);
+  Py_XDECREF(py_x);
+  Py_XDECREF(py_y);
+
+  return status;
+}
+
+int contourplot(
+  float* arr,
+  int row,
+  int col,
+  float xmin,
+  float xmax,
+  float ymin,
+  float ymax
+)
+{
+  int status = -1;
+
+  PyObject* py_arr = NULL;
+  PyObject* args = NULL;
+
+  PyObject* py_xmin = NULL;
+  PyObject* py_xmax = NULL;
+  PyObject* py_ymin = NULL;
+  PyObject* py_ymax = NULL;
+
+  if (plot_python_init() != 0)
+    goto cleanup;
+
+  npy_intp dims[2] = {row, col};
+
+  py_arr = PyArray_SimpleNewFromData(
+    2,
+    dims,
+    NPY_FLOAT32,
+    arr
+  );
+  if (err_py(py_arr) != 0)
+    goto cleanup;
+
+  py_xmin = PyFloat_FromDouble(xmin);
+  py_xmax = PyFloat_FromDouble(xmax);
+  py_ymin = PyFloat_FromDouble(ymin);
+  py_ymax = PyFloat_FromDouble(ymax);
+
+  args = PyTuple_Pack(
+    5,
+    py_arr,
+    py_xmin,
+    py_xmax,
+    py_ymin,
+    py_ymax
+  );
+  if (err_py(args) != 0)
+    goto cleanup;
+
+  status = plot_python_call("contourplot", args);
+
+cleanup:
+  Py_XDECREF(args);
+
+  Py_XDECREF(py_ymax);
+  Py_XDECREF(py_ymin);
+  Py_XDECREF(py_xmax);
+  Py_XDECREF(py_xmin);
+
   Py_XDECREF(py_arr);
 
   return status;

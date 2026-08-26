@@ -138,3 +138,89 @@ def plot2d(arr: np.ndarray) -> None:
   
   plt.tight_layout()
   plt.show()
+
+def plot3d(arr: np.ndarray, x: np.ndarray, y: np.ndarray) -> None:
+  x_grid, y_grid = np.meshgrid(x, y)
+
+  fig = plt.figure(figsize=(14, 6))
+
+  ax1 = fig.add_subplot(1, 2, 1, projection="3d")
+  ax2 = fig.add_subplot(1, 2, 2)
+
+  surf = ax1.plot_surface(
+    x_grid,
+    y_grid,
+    arr,
+    cmap="viridis",
+    alpha=0.8
+  )
+
+  ax1.contour(
+    x_grid,
+    y_grid,
+    arr,
+    zdir="z",
+    offset=np.min(arr),
+    levels=20,
+    cmap="viridis"
+  )
+
+  ax1.set_xlabel(r"$x$")
+  ax1.set_ylabel(r"$y$")
+  ax1.set_zlabel(r"$f(x,y)$")
+  ax1.view_init(elev=15, azim=4)
+
+  im = ax2.imshow(
+    arr,
+    extent=[x.min(), x.max(), y.min(), y.max()],
+    origin="lower",
+    cmap="viridis",
+    aspect="auto"
+  )
+
+  ax2.set_xlabel(r"$x$")
+  ax2.set_ylabel(r"$y$")
+
+  fig.colorbar(surf, ax=ax1, shrink=0.6)
+  fig.colorbar(im, ax=ax2)
+
+  plt.tight_layout()
+  plt.show()
+
+def contourplot(
+  Z,
+  xmin,
+  xmax,
+  ymin,
+  ymax,
+  ncontours=50,
+  fill=False
+):
+  row, col = Z.shape
+
+  x = np.linspace(xmin, xmax, col)
+  y = np.linspace(ymin, ymax, row)
+
+  X, Y = np.meshgrid(x, y)
+
+  plt.figure(figsize=(10, 8))
+
+  if fill:
+    plt.contourf(X, Y, Z, ncontours)
+  else:
+    plt.contour(X, Y, Z, ncontours)
+
+  min_y_idx, min_x_idx = np.unravel_index(
+    np.argmin(Z),
+    Z.shape
+  )
+
+  min_x = x[min_x_idx]
+  min_y = y[min_y_idx]
+
+  plt.scatter(min_x, min_y, marker="x", s=50, color="r", label="Global Minimum")
+  #plt.scatter(1, 1, marker="x", s=50, color="b", label="Analytical Global Minimum")
+
+  plt.legend(loc="upper left")
+  plt.tight_layout()
+  plt.show()
