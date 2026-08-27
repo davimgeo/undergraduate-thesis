@@ -2,19 +2,20 @@
 #include "utils.h"
 #include <math.h>
 
+#define MAX(a, b) ((a) > (b) ? (a) : (b))
+
 #define SIZE 201
 
 #define XMIN -2.0f
 #define XMAX 2.0f
-
 #define YMIN -2.0f
 #define YMAX 2.0f
 
 #define PI 3.14159f
 #define E  2.71828f
 
-#define TOL 1e-9
-#define MAX_ITERATIONS 20
+#define TOL 1e-6
+#define MAX_ITERATIONS 2001
 
 typedef struct Point 
 {
@@ -40,8 +41,8 @@ float* get_rosenbrock(void)
       int idx = ix * SIZE + iy;
 
       rosenbrock[idx] =
-        (1.0f - y)*(1.0f - y) +
-        10.0f*(x - y*y)*(x - y*y);
+        (1.0f - x)*(1.0f - x) +
+        10.0f*(y - x*x)*(y - x*x);
     }
   }
 
@@ -50,16 +51,18 @@ float* get_rosenbrock(void)
 
 float get_rosenbrock_value(Point p)
 {
- return (1.0f - p.y)*(1.0f - p.y) + 
-        10.0f*(p.x - p.y*p.y)*(p.x - p.y*p.y);
+ return (1.0f - p.x)*(1.0f - p.x) + 
+        10.0f*(p.y - p.x*p.x)*(p.y - p.x*p.x);
 }
 
-Point get_rosenbrock_gradient(Point p)
+Point get_nabla_gradient(Point p, float dcalc, float dobs)
 {
   Point nabla;
 
-  nabla.x = 40.0f * p.x*p.x*p.x - 40.0f*p.x*p.y + 2.0f*p.x - 2.0f;
-  nabla.y = 20.0f * (p.y - p.x*p.x);
+  float r = (dcalc - dobs);
+
+  nabla.x = (40.0f * p.x*p.x*p.x - 40.0f*p.x*p.y + 2.0f*p.x - 2.0f) * r;
+  nabla.y = (20.0f * (p.y - p.x*p.x)) * r;
 
   return nabla;
 }
@@ -75,39 +78,53 @@ int main()
 
   float* rosenbrock = get_rosenbrock();
 
-  contourplot(rosenbrock, SIZE, SIZE, XMIN, XMAX, YMIN, YMAX);
+  //contourplot(rosenbrock, SIZE, SIZE, XMIN, XMAX, YMIN, YMAX);
 
   /**************************** Steepest Descent ******************************/
 
   Point mreal = {.x = 1.0f, .y = 1.0f}; // global minimum
   float dobs = get_rosenbrock_value(mreal);
 
-  Point m_current  = {.x = 0.3f, .y = 0.7f};
-  float a_k = 0.01f;
+  Point m_current  = {.x = -0.5f, .y = 0.5f};
+  float a_k = 0.01f * MAX(m_current.x, m_current.y);
 
+  int i = 0; 
   for (int it = 0; it < MAX_ITERATIONS; it++) 
   {
+    /* mk = m_current
+     * dcalc = G(m_k)
+     * \chi(m_k) = ||dobs - dcalc||^2_2
+     * \nabla\chi(m_k) = \Delta d \nabla f */
     Point mk = m_current;
     float dcalc_0 = get_rosenbrock_value(mk);
     float chi_mk = l2_norm(dobs, dcalc_0);
-    Point nabla_chi = get_rosenbrock_gradient(mk);
+    Point nabla_chi = get_nabla_gradient(mk, dcalc_0, dobs);
 
-    // m_{k+1} = m_k - a_k\nabla\chi(m_k)
+    /* m_{k+1} = m_k - a_k\nabla\chi(m_k)
+     * dcalc = G(m_{k+1})
+     * \chi(m_{k+1}) = ||d_bs - dcalc||^2_2 */
     Point mk1 = {
       .x = mk.x - a_k*nabla_chi.x, 
       .y = mk.y - a_k*nabla_chi.y
     };
     float dcalc_1 = get_rosenbrock_value(mk1); 
     float chi_mk1 = l2_norm(dobs, dcalc_1);
+   
+    /*\chi(m_{k+1}) <= \chi(m_k) - c_1 \alpha_k ||\nable\chi(m_k)||^2_2 */
+    float grad_norm2 = nabla_chi.x*nabla_chi.x + nabla_chi.y*nabla_chi.y;
+    float armijo_condition = chi_mk - 1e-4f*a_k*grad_norm2;
 
-    if(chi_mk1 < chi_mk)
+    if(chi_mk1 < armijo_condition)
     {
-      // update alpha_k
-      // m_current = m_k+1
+      m_current = mk1;
+      a_k = 0.01f * MAX(m_current.x, m_current.y);
+      if(!(i % 10)) printf("m_current: (%g, %g)\n", m_current.x, m_current.y);
+      //if(!(i % 10))printf("a_k: %g\n", a_k);
+      i++;
     }
 
-    if((chi_mk / dobs) < TOL)
-      goto END;
+    //if((chi_mk / dobs) < TOL)
+      //goto END;
       
   }
 
