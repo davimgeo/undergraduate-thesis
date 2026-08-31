@@ -72,7 +72,10 @@ def plot_model_geometry(
 
   model = model[nb:nb + nz, nb:nb + nx]
 
-  _, ax = plt.subplots(figsize=(8, 10))
+  size  = (8, 10)
+  if nxx > nzz: size = (10, 8)
+
+  _, ax = plt.subplots(figsize=size)
 
   vmin = np.percentile(model, 100 - perc)
   vmax = np.percentile(model, perc)

@@ -10,12 +10,12 @@
 #include "plot.h"
 #include "IO.h"
 
-#define V0          2000.0f
-#define REF_ALPHA   2.0f
+#define V0          2500.0f
+#define REF_ALPHA   0.7f
 
 #define SIZE        51
-#define ALPHA_MIN   1.0f
-#define ALPHA_MAX   3.0f
+#define ALPHA_MIN   0.45f
+#define ALPHA_MAX   0.95f
 
 #define T0          0.5f
 
