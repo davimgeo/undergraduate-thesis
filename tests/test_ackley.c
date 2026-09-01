@@ -14,8 +14,9 @@
 #define PI 3.14159f
 #define E  2.71828f
 
-#define TOL 1e-6
+#define TOL 1e-8
 #define MAX_ITERATIONS 2001
+#define C1 1e-4f
 
 typedef struct Point 
 {
@@ -23,9 +24,9 @@ typedef struct Point
   float y;
 } Point; 
 
-float* get_rosenbrock(void)
+float* get_ackley(void)
 {
-  float* rosenbrock = malloc(SIZE * SIZE * sizeof(*rosenbrock));
+  float* ackley = malloc(SIZE * SIZE * sizeof(*ackley));
 
   float dx = (XMAX - XMIN) / (float)(SIZE - 1);
   float dy = (YMAX - YMIN) / (float)(SIZE - 1);
@@ -39,20 +40,22 @@ float* get_rosenbrock(void)
       float y = YMIN + iy*dy;
 
       int idx = ix * SIZE + iy;
-
-      rosenbrock[idx] =
-        (1.0f - x)*(1.0f - x) +
-        10.0f*(y - x*x)*(y - x*x);
+      ackley[idx] =
+        -20.0f * expf(-0.2f * sqrtf(0.5f * (x*x + y*y))) -
+        expf(0.5f * (cosf(2.0f * PI * x) + cosf(2.0f * PI * y))) +
+        E + 20.0f;
     }
   }
 
-  return rosenbrock;
+  return ackley;
 }
 
-float get_rosenbrock_value(Point p)
+float get_ackley_value(Point p)
 {
- return (1.0f - p.x)*(1.0f - p.x) + 
-        10.0f*(p.y - p.x*p.x)*(p.y - p.x*p.x);
+  return
+    -20.0f * expf(-0.2f * sqrtf(0.5f * (p.x*p.x + p.y*p.y))) -
+    expf(0.5f * (cosf(2.0f * PI * p.x) + cosf(2.0f * PI * p.y))) +
+    E + 20.0f;
 }
 
 Point get_nabla_gradient(Point p, float dcalc, float dobs)
@@ -76,20 +79,21 @@ int main()
 {
   PROFILE_BEGIN();
 
-  float* rosenbrock = get_rosenbrock();
+  float* ackley = get_ackley();
 
-  //contourplot(rosenbrock, SIZE, SIZE, XMIN, XMAX, YMIN, YMAX);
+  contourplot(ackley, SIZE, SIZE, XMIN, XMAX, YMIN, YMAX);
 
   /**************************** Steepest Descent ******************************/
 
   Point mreal = {.x = 1.0f, .y = 1.0f}; // global minimum
-  float dobs = get_rosenbrock_value(mreal);
+  float dobs = get_ackley_value(mreal);
 
-  Point m_current  = {.x = -0.5f, .y = 0.5f};
+  Point m_current  = {.x = -1.5f, .y = 0.5f};
+  float dcalc_0 = get_ackley_value(m_current);
+  float chi_m0 = l2_norm(dobs, dcalc_0);
   //float a_k = 0.01f * MAX(m_current.x, m_current.y);
   float a_k = 1.0f;
 
-  int i = 0; 
   for (int it = 0; it < MAX_ITERATIONS; it++) 
   {
     /* mk = m_current
@@ -97,9 +101,9 @@ int main()
      * \chi(m_k) = ||dobs - dcalc||^2_2
      * \nabla\chi(m_k) = \Delta d \nabla f */
     Point mk = m_current;
-    float dcalc_0 = get_rosenbrock_value(mk);
+    float dcalc_current = get_ackley_value(mk);
     float chi_mk = l2_norm(dobs, dcalc_0);
-    Point nabla_chi = get_nabla_gradient(mk, dcalc_0, dobs);
+    Point nabla_chi = get_nabla_gradient(mk, dcalc_current, dobs);
 
     /* m_{k+1} = m_k - a_k\nabla\chi(m_k)
      * dcalc = G(m_{k+1})
@@ -108,12 +112,12 @@ int main()
       .x = mk.x - a_k*nabla_chi.x, 
       .y = mk.y - a_k*nabla_chi.y
     };
-    float dcalc_1 = get_rosenbrock_value(mk1); 
+    float dcalc_1 = get_ackley_value(mk1); 
     float chi_mk1 = l2_norm(dobs, dcalc_1);
    
     /*\chi(m_{k+1}) <= \chi(m_k) - c_1 \alpha_k ||\nable\chi(m_k)||^2_2 */
     float grad_norm2 = nabla_chi.x*nabla_chi.x + nabla_chi.y*nabla_chi.y;
-    float armijo_condition = chi_mk - 1e-4f*a_k*grad_norm2;
+    float armijo_condition = chi_mk - C1*a_k*grad_norm2;
 
     if(chi_mk1 < armijo_condition)
     {
@@ -125,7 +129,7 @@ int main()
       if(!(it % 10))printf("a_k: %g\n", a_k);
     }
 
-    if((chi_mk / dobs) < TOL)
+    if((chi_mk / chi_m0) <= TOL)
       goto END;
       
   }
@@ -133,7 +137,7 @@ int main()
   END:
     PROFILE_END();
 
-    free(rosenbrock);
+    free(ackley);
 
   return 0;
 }

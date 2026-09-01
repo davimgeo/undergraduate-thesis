@@ -28,3 +28,15 @@ int contourplot(
   float ymin,
   float ymax
 );
+int contourplot_opt(
+  float* arr,
+  float* x,
+  float* y,
+  int npoints,
+  int row,
+  int col,
+  float xmin,
+  float xmax,
+  float ymin,
+  float ymax
+);

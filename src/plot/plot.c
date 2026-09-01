@@ -551,3 +551,96 @@ cleanup:
 
   return status;
 }
+
+int contourplot_opt(
+  float* arr,
+  float* x,
+  float* y,
+  int npoints,
+  int row,
+  int col,
+  float xmin,
+  float xmax,
+  float ymin,
+  float ymax
+)
+{
+  int status = -1;
+
+  PyObject* py_arr = NULL;
+  PyObject* py_x = NULL;
+  PyObject* py_y = NULL;
+  PyObject* args = NULL;
+
+  PyObject* py_xmin = NULL;
+  PyObject* py_xmax = NULL;
+  PyObject* py_ymin = NULL;
+  PyObject* py_ymax = NULL;
+
+  if (plot_python_init() != 0)
+    goto cleanup;
+
+  npy_intp dims[2] = {row, col};
+  npy_intp path_dims[1] = {npoints};
+
+  py_arr = PyArray_SimpleNewFromData(
+    2,
+    dims,
+    NPY_FLOAT32,
+    arr
+  );
+  if (err_py(py_arr) != 0)
+    goto cleanup;
+
+  py_x = PyArray_SimpleNewFromData(
+    1,
+    path_dims,
+    NPY_FLOAT32,
+    x
+  );
+  if (err_py(py_x) != 0)
+    goto cleanup;
+
+  py_y = PyArray_SimpleNewFromData(
+    1,
+    path_dims,
+    NPY_FLOAT32,
+    y
+  );
+  if (err_py(py_y) != 0)
+    goto cleanup;
+
+  py_xmin = PyFloat_FromDouble(xmin);
+  py_xmax = PyFloat_FromDouble(xmax);
+  py_ymin = PyFloat_FromDouble(ymin);
+  py_ymax = PyFloat_FromDouble(ymax);
+
+  args = PyTuple_Pack(
+    7,
+    py_arr,
+    py_x,
+    py_y,
+    py_xmin,
+    py_xmax,
+    py_ymin,
+    py_ymax
+  );
+  if (err_py(args) != 0)
+    goto cleanup;
+
+  status = plot_python_call("contourplot_opt", args);
+
+cleanup:
+  Py_XDECREF(args);
+
+  Py_XDECREF(py_ymax);
+  Py_XDECREF(py_ymin);
+  Py_XDECREF(py_xmax);
+  Py_XDECREF(py_xmin);
+
+  Py_XDECREF(py_y);
+  Py_XDECREF(py_x);
+  Py_XDECREF(py_arr);
+
+  return status;
+}

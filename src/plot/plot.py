@@ -227,3 +227,49 @@ def contourplot(
   plt.legend(loc="upper left")
   plt.tight_layout()
   plt.show()
+
+def contourplot_opt(
+  Z,
+  x,
+  y,
+  xmin,
+  xmax,
+  ymin,
+  ymax,
+  ncontours=50,
+  fill=True
+):
+  row, col = Z.shape
+
+  x_axis = np.linspace(xmin, xmax, col)
+  y_axis = np.linspace(ymin, ymax, row)
+
+  X, Y = np.meshgrid(x_axis, y_axis)
+
+  plt.figure(figsize=(10, 8))
+
+  if fill:
+    plt.contourf(X, Y, Z, ncontours)
+  else:
+    plt.contour(X, Y, Z, ncontours)
+
+  min_y_idx, min_x_idx = np.unravel_index(
+    np.argmin(Z),
+    Z.shape
+  )
+
+  min_x = x_axis[min_x_idx]
+  min_y = y_axis[min_y_idx]
+
+  plt.scatter(min_x, min_y, marker="x", s=50, color="r", label="Global Minimum")
+
+  plt.plot(
+    x,
+    y,
+    marker="o",
+    label="Optimization Path"
+  )
+
+  plt.legend(loc="upper left")
+  plt.tight_layout()
+  plt.show()

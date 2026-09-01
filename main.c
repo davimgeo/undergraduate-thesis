@@ -1,255 +1,197 @@
-#include <stdlib.h>
-#include <propagation.h>
-#include "cross.objf.h"
-#include "decon_objf.h"
-#include "euclidian.h"
-#include "fft.h"
-#include "geometry.h"
-#include "utils.h"
-#include "config/config.h"
 #include "plot.h"
-#include "IO.h"
+#include "utils.h"
+#include <math.h>
 
-#define DH 10.0f
+#define MAX(a, b) ((a) > (b) ? (a) : (b))
+#define MIN(a, b) (((a) < (b)) ? (a) : (b))
 
-#define REF_V0      2000.0f
-#define REF_ALPHA   0.7f
+#define SIZE 501
 
-#define SIZE        31
-#define ALPHA_MIN   0.45f
-#define ALPHA_MAX   0.8f
-#define V0_MIN      1500.0f
-#define V0_MAX      2500.0f
+#define XMIN -2.0f
+#define XMAX 2.0f
+#define YMIN -2.0f
+#define YMAX 2.0f
 
-#define T0          1.0f
+#define PI 3.14159f
 
-float* get_model(int nz, int nx, int v0, float alpha)
+#define TOL 1e-8f
+#define MAX_ITERATIONS 1001
+
+typedef struct Point 
 {
-  float* model = (float*)malloc(nz * nx * sizeof(float));
-  if (model == NULL) return NULL;
+  float x; 
+  float y;
+} Point; 
 
-  #pragma omp parallel for schedule(static)
-  for (int i = 0; i < nz; i++)
+float* get_rosenbrock(void)
+{
+  float* rosenbrock = malloc(SIZE * SIZE * sizeof(*rosenbrock));
+
+  float dx = (XMAX - XMIN) / (float)(SIZE - 1);
+  float dy = (YMAX - YMIN) / (float)(SIZE - 1);
+
+  for (int ix = 0; ix < SIZE; ix++)
   {
-    for (int j = 0; j < nx; j++)
+    float x = XMIN + ix*dx;
+
+    for (int iy = 0; iy < SIZE; iy++)
     {
-      model[i * nx + j] = v0 + alpha * i * DH;
+      float y = YMIN + iy*dy;
+
+      int idx = ix * SIZE + iy;
+
+      rosenbrock[idx] =
+        (1.0f - x)*(1.0f - x) +
+        10.0f*(y - x*x)*(y - x*x);
     }
   }
 
-  return model;
+  return rosenbrock;
 }
 
-float* get_dobs(
-  SpecsContext* specs,
-  geometry_t* geom,
-  wavelet_t* wave
-)
+float get_rosenbrock_value(Point p)
 {
-  float* base_model = get_model(
-    specs->model.nz,
-    specs->model.nx,
-    REF_V0,
-    REF_ALPHA
+ return (1.0f - p.x)*(1.0f - p.x) + 
+        10.0f*(p.y - p.x*p.x)*(p.y - p.x*p.x);
+}
+
+Point get_nabla_gradient(Point p, float dcalc, float dobs)
+{
+  Point nabla;
+
+  float r = (dcalc - dobs);
+
+  nabla.x = (40.0f * p.x*p.x*p.x - 40.0f*p.x*p.y + 2.0f*p.x - 2.0f) * r;
+  nabla.y = (20.0f * (p.y - p.x*p.x)) * r;
+
+ float norm = sqrtf(
+    nabla.x*nabla.x +
+    nabla.y*nabla.y
   );
 
-  model_t* model = Model_Init(NULL, &specs->model);
-  Model_Set(model, base_model);
-  Model_Extent(model);
+  if (norm > 0.0f)
+  {
+    nabla.x /= norm;
+    nabla.y /= norm;
+  }
+  return nabla;
+}
 
-  seismogram_t* seis = Seismogram_Init(
-    NULL,
-    &specs->seismogram,
-    geom->nrec, 0
-  );
-
-  propagation_t* prop = Propagation_Init(
-    NULL,
-    &specs->propagation,
-    model,
-    geom,
-    wave,
-    seis,
-    PROPAGATION_ACOUSTIC
-  );
-
-  Propagation_Run(prop, 0);
-
-  float* dobs = seis->seismogram;
-  plot_seismogram(seis, geom->offset_rec);
-  plot_model_geometry(model, DH, geom);
-  return dobs;
+float l2_norm(float dobs, float dcalc)
+{
+  return 0.5f * (dobs - dcalc) * (dobs - dcalc);
 }
 
 int main()
 {
   PROFILE_BEGIN();
 
-  SpecsContext* specs = Specs_Init(NULL);
+  float* rosenbrock = get_rosenbrock();
 
-  geometry_t* geom = Geometry_InitCreate(NULL, &specs->geometry);
-  Geometry_Create(geom, GEOMETRY_ONLY_RECEIVERS);
-  Geometry_SetSource(geom, 850, 50);
+  /**************************** Steepest Descent ******************************/
 
-  wavelet_t* wave = Wavelet_Init(NULL, &specs->wavelet);
-  Wavelet_Create(wave);
+  Point mreal = {.x = 1.0f, .y = 1.0f}; // global minimum
+  float dobs = get_rosenbrock_value(mreal);
 
-  float* dobs = get_dobs(specs, geom, wave);
+  Point m_current = {.x = -0.5f, .y = 0.5f};
 
-  float* alphas = malloc(SIZE * sizeof(float));
-  float* v0     = malloc(SIZE * sizeof(float));
+  float dcalc_0 = get_rosenbrock_value(m_current);
+  float chi_m0 = l2_norm(dobs, dcalc_0);
 
-  float* l2    = malloc(SIZE * SIZE * sizeof(float));
-  float* l1    = malloc(SIZE * SIZE * sizeof(float));
-  float* cross = malloc(SIZE * SIZE * sizeof(float));
-  float* decon = malloc(SIZE * SIZE * sizeof(float));
+  float a_k = 1.0f;
 
-  if (alphas == NULL || v0 == NULL || l2 == NULL || l1 == NULL ||
-      cross == NULL || decon == NULL)
+  float* model_updates_x =
+    (float*)malloc((MAX_ITERATIONS + 1) * sizeof(float));
+
+  float* model_updates_y =
+    (float*)malloc((MAX_ITERATIONS + 1) * sizeof(float));
+
+  // Store initial model m0
+  int final_model_idx = 0;
+
+  model_updates_x[final_model_idx] = m_current.x;
+  model_updates_y[final_model_idx] = m_current.y;
+  final_model_idx++;
+
+  for (int it = 0; it < MAX_ITERATIONS; it++) 
   {
-    free(alphas);
-    free(v0);
-    free(l2);
-    free(l1);
-    free(cross);
-    free(decon);
+    // mk = m_current
+    Point mk = m_current;
 
-    return -1;
-  }
+    // dcalc = G(m_k)
+    float dcalc_current = get_rosenbrock_value(mk);
 
-  float da = (ALPHA_MAX - ALPHA_MIN) / (float)(SIZE - 1);
-  float dv = (V0_MAX - V0_MIN) / (float)(SIZE - 1);
+    // chi(m_k)
+    float chi_mk = l2_norm(dobs, dcalc_current);
 
-  for (int i = 0; i < SIZE; i++)
-  {
-    v0[i] = V0_MIN + i * dv;
-    alphas[i] = ALPHA_MIN + i * da;
-  }
+    // nabla chi(m_k)
+    Point nabla_chi =
+      get_nabla_gradient(mk, dcalc_current, dobs);
 
-  for (int i = 0; i < SIZE; i++)
-  {
-    for (int j = 0; j < SIZE; j++)
+    // m_{k+1} = m_k - a_k nabla chi(m_k)
+    Point mk1 = {
+      .x = mk.x - a_k*nabla_chi.x, 
+      .y = mk.y - a_k*nabla_chi.y
+    };
+
+    // dcalc = G(m_{k+1})
+    float dcalc_1 = get_rosenbrock_value(mk1); 
+
+    // chi(m_{k+1})
+    float chi_mk1 = l2_norm(dobs, dcalc_1);
+
+    // Armijo condition
+    float grad_norm2 =
+      nabla_chi.x*nabla_chi.x +
+      nabla_chi.y*nabla_chi.y;
+
+    float armijo_condition =
+      chi_mk - 1e-4f*a_k*grad_norm2;
+
+    if (chi_mk1 < armijo_condition)
     {
-      int idx = i * SIZE + j;
+      m_current = mk1;
 
-      float* grad_model = get_model(
-        specs->model.nz,
-        specs->model.nx,
-        v0[i],
-        alphas[j]
-      );
+      model_updates_x[final_model_idx] = m_current.x;
+      model_updates_y[final_model_idx] = m_current.y;
+      final_model_idx++;
+    } else {
+      a_k *= 0.5f;
+    }
 
-      model_t* grad_model_obj = Model_Init(NULL, &specs->model);
-      Model_Set(grad_model_obj, grad_model);
-      Model_Extent(grad_model_obj);
-
-      seismogram_t* seis_grad = Seismogram_Init(
-        NULL,
-        &specs->seismogram,
-        geom->nrec,
-        0
-      );
-
-      propagation_t* prop_grad = Propagation_Init(
-        NULL,
-        &specs->propagation,
-        grad_model_obj,
-        geom,
-        wave,
-        seis_grad,
-        PROPAGATION_ACOUSTIC
-      );
-      Propagation_Run(prop_grad, 0);
-
-      float* dcalc = seis_grad->seismogram;
-      int nt = seis_grad->nt;
-      int nrec = seis_grad->nrec;
-      //plot_seismogram(seis_grad, geom->offset_rec);
-      //plot2d(dobs, seis_grad->nt, seis_grad->nrec);
-
-      l2[idx] = l2_squared_norm_2d(
-        dcalc,
-        dobs,
-        nt,
-        nrec
-      );
-
-      l1[idx] = l1_norm_2d(
-        dcalc,
-        dobs,
-        nt,
-        nrec,
-        seis_grad->dt
-      );
-
-      cross[idx] = get_cross_2d(
-        dcalc,
-        dobs,
-        seis_grad->dt,
-        nt,
-        geom->nrec,
-        T0
-      );
-
-      decon[idx] = get_decon_2d(
-        dcalc,
-        dobs,
-        seis_grad->dt,
-        nt,
-        geom->nrec,
-        T0
-      );
-
-      printf(
-        "V0: %g | Alpha: %g | L2: %g | L1: %g | Cross: %g | Decon: %g\n",
-        v0[i],
-        alphas[j],
-        l2[idx],
-        l1[idx],
-        cross[idx],
-        decon[idx]
-      );
-
-      //Propagation_Destroy(prop_grad);
-      //Seismogram_Destroy(seis_grad);
-      //Model_Destroy(grad_model_obj);
-      //free(grad_model);
-
-      progress_bar(idx, SIZE * SIZE);
+    if ((chi_mk / chi_m0) <= TOL)
+    {
+      printf("Last Iteration: %d\n", it);
+      goto END;
     }
   }
 
-  normalize(l2, SIZE * SIZE);
-  normalize(l1, SIZE * SIZE);
-  normalize(cross, SIZE * SIZE);
-  normalize(decon, SIZE * SIZE);
+END:
 
   PROFILE_END();
 
-  write1d("data/l2.bin", l2, sizeof(float), SIZE * SIZE);
-  write1d("data/l1.bin", l1, sizeof(float), SIZE * SIZE);
-  write1d("data/cross.bin", cross, sizeof(float), SIZE * SIZE);
-  write1d("data/decon.bin", decon, sizeof(float), SIZE * SIZE);
+  printf(
+    "m_current: (%g, %g)\n",
+    m_current.x,
+    m_current.y
+  );
 
-  write1d("data/alphas.bin", alphas, sizeof(float), SIZE);
-  write1d("data/v0.bin", v0, sizeof(float), SIZE);
+  contourplot_opt(
+    rosenbrock,
+    model_updates_x,
+    model_updates_y,
+    final_model_idx,
+    SIZE,
+    SIZE,
+    XMIN,
+    XMAX,
+    YMIN,
+    YMAX
+  );
 
-  plot3d(decon, alphas, v0, SIZE, SIZE);
-  plot3d(cross, alphas, v0, SIZE, SIZE);
-  plot3d(l2, alphas, v0, SIZE, SIZE);
-  plot3d(l1, alphas, v0, SIZE, SIZE);
-
-  free(alphas);
-  free(v0);
-  free(l2);
-  free(l1);
-  free(cross);
-  free(decon);
+  free(model_updates_y);
+  free(model_updates_x);
+  free(rosenbrock);
 
   return 0;
 }
-
-
-
-
-
