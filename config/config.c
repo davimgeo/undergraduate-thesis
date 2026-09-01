@@ -10,7 +10,7 @@ SpecsContext* Specs_Init(SpecsContext* specs)
   {
     .wavelet =
     {
-      .dt = 1e-3f,
+      .dt = 4e-3f,
       .fmax = 30.0f,
       .nt = 5001,
       .tlag = 0.15,
@@ -31,7 +31,7 @@ SpecsContext* Specs_Init(SpecsContext* specs)
     {
       .nx = 1701,
       .nz = 351,
-      .nb = 100,
+      .nb = 150,
 
       .interfaces_size = 1,
 
@@ -42,14 +42,14 @@ SpecsContext* Specs_Init(SpecsContext* specs)
     .seismogram =
     {
       .nt = 5001,
-      .dt = 1e-3f
+      .dt = 4e-3f
     },
 
     .propagation =
     {
       .nt = 5001,
-      .dt = 1e-3f,
-      .dh = 10,
+      .dt = 4e-3f,
+      .dh = 40,
 
       .factor = 0.0015f
     }

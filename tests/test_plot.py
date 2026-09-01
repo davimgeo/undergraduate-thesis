@@ -1,12 +1,12 @@
 import numpy as np 
 import matplotlib.pyplot as plt 
 
-SIZE = 201
+SIZE = 51
 
-REF_ALPHA = 2.0
+REF_ALPHA = 0.7
 
-alphas = np.fromfile("data/alphas_51.bin", dtype=np.float32, count=SIZE)
-da     = alphas - REF_ALPHA
+alphas = np.fromfile("data/v0_51.bin", dtype=np.float32, count=SIZE)
+da     = alphas 
 
 cross = np.fromfile("data/cross_51.bin", dtype=np.float32, count=SIZE)
 decon = np.fromfile("data/decon_51.bin", dtype=np.float32, count=SIZE)

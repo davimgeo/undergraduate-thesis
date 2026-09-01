@@ -75,7 +75,7 @@ float get_decon_1d(float *dcalc, float *dobs, float dt, int nt, float t0)
 
   if(!initialized)
   {
-    //plot1d(P, nt);
+    plot1d(P, nt);
     //plot1d(d, nt);
     initialized = 1;
   }
