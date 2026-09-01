@@ -2,8 +2,6 @@
 #include "utils.h"
 #include <math.h>
 
-#define MAX(a, b) ((a) > (b) ? (a) : (b))
-
 #define SIZE 501
 
 #define XMIN -2.0f
@@ -12,10 +10,10 @@
 #define YMAX 2.0f
 
 #define PI 3.14159f
-#define E  2.71828f
 
-#define TOL 1e-6
-#define MAX_ITERATIONS 2001
+#define TOL 1e-8f
+#define C1 1e-4f
+#define MAX_ITERATIONS 501
 
 typedef struct Point 
 {
@@ -40,9 +38,7 @@ float* get_rosenbrock(void)
 
       int idx = ix * SIZE + iy;
 
-      rosenbrock[idx] =
-        (1.0f - x)*(1.0f - x) +
-        10.0f*(y - x*x)*(y - x*x);
+      rosenbrock[idx] = (1.0f - x)*(1.0f - x) + 10.0f*(y - x*x)*(y - x*x);
     }
   }
 
@@ -78,70 +74,112 @@ int main()
 
   float* rosenbrock = get_rosenbrock();
 
-  //contourplot(rosenbrock, SIZE, SIZE, XMIN, XMAX, YMIN, YMAX);
-
   /**************************** Steepest Descent ******************************/
 
   Point mreal = {.x = 1.0f, .y = 1.0f}; // global minimum
   float dobs = get_rosenbrock_value(mreal);
 
-  Point m_current  = {.x = -0.5f, .y = 0.5f};
-  //float a_k = 0.01f * MAX(m_current.x, m_current.y);
-  float a_k = 1.0f;
+  Point m_current = {.x = -0.5f, .y = 0.5f};
 
-  int i = 0; 
+  float dcalc_0 = get_rosenbrock_value(m_current);
+  float chi_m0 = l2_norm(dobs, dcalc_0);
+
+  float* model_updates_x = (float*)malloc((MAX_ITERATIONS + 1) * sizeof(float));
+  float* model_updates_y = (float*)malloc((MAX_ITERATIONS + 1) * sizeof(float));
+
+  // Store initial model m0
+  int final_model_idx = 0;
+
+  model_updates_x[final_model_idx] = m_current.x;
+  model_updates_y[final_model_idx] = m_current.y;
+  final_model_idx++;
+
   for (int it = 0; it < MAX_ITERATIONS; it++) 
   {
-    /* mk = m_current
-     * dcalc = G(m_k)
-     * \chi(m_k) = ||dobs - dcalc||^2_2
-     * \nabla\chi(m_k) = \Delta d \nabla f */
+    // mk = m_current
     Point mk = m_current;
-    float dcalc_0 = get_rosenbrock_value(mk);
-    float chi_mk = l2_norm(dobs, dcalc_0);
-    Point nabla_chi = get_nabla_gradient(mk, dcalc_0, dobs);
+    // dcalc = G(m_k)
+    float dcalc_current = get_rosenbrock_value(mk);
+    // chi(m_k)
+    float chi_mk = l2_norm(dobs, dcalc_current);
+    // nabla chi(m_k)
+    Point nabla_chi = get_nabla_gradient(mk, dcalc_current, dobs);
 
-    /* m_{k+1} = m_k - a_k\nabla\chi(m_k)
-     * dcalc = G(m_{k+1})
-     * \chi(m_{k+1}) = ||d_bs - dcalc||^2_2 */
-    Point mk1 = {
-      .x = mk.x - a_k*nabla_chi.x, 
-      .y = mk.y - a_k*nabla_chi.y
+    float grad_norm = sqrtf(
+      nabla_chi.x*nabla_chi.x +
+      nabla_chi.y*nabla_chi.y
+    );
+    // normalized descent direction
+    Point h_k = {
+      .x = -nabla_chi.x / grad_norm,
+      .y = -nabla_chi.y / grad_norm
     };
-    float dcalc_1 = get_rosenbrock_value(mk1); 
-    float chi_mk1 = l2_norm(dobs, dcalc_1);
-   
-    /*\chi(m_{k+1}) <= \chi(m_k) - c_1 \alpha_k ||\nable\chi(m_k)||^2_2 */
-    float grad_norm2 = nabla_chi.x*nabla_chi.x + nabla_chi.y*nabla_chi.y;
-    float armijo_condition = chi_mk - 1e-4f*a_k*grad_norm2;
+    float gTp = nabla_chi.x*h_k.x + nabla_chi.y*h_k.y;
 
-    if(chi_mk1 < armijo_condition)
+    float a_k = 1.0f;
+
+    // line search
+    for (int i = 0; i < 30; i++)
     {
-      m_current = mk1;
-      //a_k = 0.01f * MAX(m_current.x, m_current.y);
-      if(!(it % 10)) printf("m_current: (%g, %g)\n", m_current.x, m_current.y);
-    } else {
-      a_k /= 2.0f;
-      if(!(it % 10))printf("a_k: %g\n", a_k);
+      // m_{k+1} = m_k - a_k \nabla\chi(m_k)
+      Point mk1 = {
+        .x = mk.x + a_k*h_k.x,
+        .y = mk.y + a_k*h_k.y
+      };
+      // dcalc = G(m_{k+1})
+      float dcalc_1 = get_rosenbrock_value(mk1);
+      // chi(m_{k+1})
+      float chi_mk1 = l2_norm(dobs, dcalc_1);
+
+      int armijo = chi_mk1 <= chi_mk + C1*a_k*gTp;
+      if (armijo)
+      {
+        m_current = mk1;
+
+        model_updates_x[final_model_idx] = m_current.x;
+        model_updates_y[final_model_idx] = m_current.y;
+        final_model_idx++;
+
+        break;
+      }
+
+      a_k *= 0.5f;
     }
 
-    if((chi_mk / dobs) < TOL)
+    if ((chi_mk / chi_m0) <= TOL)
+    {
+      printf("Last Iteration: %d\n", it);
       goto END;
-      
+    }
   }
 
   END:
+
     PROFILE_END();
 
+    printf(
+      "m_current: (%g, %g)\n",
+      m_current.x,
+      m_current.y
+    );
+
+    contourplot_opt(
+      rosenbrock,
+      model_updates_x,
+      model_updates_y,
+      final_model_idx,
+      SIZE,
+      SIZE,
+      XMIN,
+      XMAX,
+      YMIN,
+      YMAX
+    );
+
+    free(model_updates_y);
+    free(model_updates_x);
     free(rosenbrock);
 
   return 0;
 }
-
-
-
-
-
-
-
 

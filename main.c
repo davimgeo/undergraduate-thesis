@@ -2,9 +2,6 @@
 #include "utils.h"
 #include <math.h>
 
-#define MAX(a, b) ((a) > (b) ? (a) : (b))
-#define MIN(a, b) (((a) < (b)) ? (a) : (b))
-
 #define SIZE 501
 
 #define XMIN -2.0f
@@ -15,7 +12,8 @@
 #define PI 3.14159f
 
 #define TOL 1e-8f
-#define MAX_ITERATIONS 1001
+#define C1 1e-4f
+#define MAX_ITERATIONS 501
 
 typedef struct Point 
 {
@@ -40,9 +38,7 @@ float* get_rosenbrock(void)
 
       int idx = ix * SIZE + iy;
 
-      rosenbrock[idx] =
-        (1.0f - x)*(1.0f - x) +
-        10.0f*(y - x*x)*(y - x*x);
+      rosenbrock[idx] = (1.0f - x)*(1.0f - x) + 10.0f*(y - x*x)*(y - x*x);
     }
   }
 
@@ -64,16 +60,6 @@ Point get_nabla_gradient(Point p, float dcalc, float dobs)
   nabla.x = (40.0f * p.x*p.x*p.x - 40.0f*p.x*p.y + 2.0f*p.x - 2.0f) * r;
   nabla.y = (20.0f * (p.y - p.x*p.x)) * r;
 
- float norm = sqrtf(
-    nabla.x*nabla.x +
-    nabla.y*nabla.y
-  );
-
-  if (norm > 0.0f)
-  {
-    nabla.x /= norm;
-    nabla.y /= norm;
-  }
   return nabla;
 }
 
@@ -98,13 +84,8 @@ int main()
   float dcalc_0 = get_rosenbrock_value(m_current);
   float chi_m0 = l2_norm(dobs, dcalc_0);
 
-  float a_k = 1.0f;
-
-  float* model_updates_x =
-    (float*)malloc((MAX_ITERATIONS + 1) * sizeof(float));
-
-  float* model_updates_y =
-    (float*)malloc((MAX_ITERATIONS + 1) * sizeof(float));
+  float* model_updates_x = (float*)malloc((MAX_ITERATIONS + 1) * sizeof(float));
+  float* model_updates_y = (float*)malloc((MAX_ITERATIONS + 1) * sizeof(float));
 
   // Store initial model m0
   int final_model_idx = 0;
@@ -117,45 +98,51 @@ int main()
   {
     // mk = m_current
     Point mk = m_current;
-
     // dcalc = G(m_k)
     float dcalc_current = get_rosenbrock_value(mk);
-
     // chi(m_k)
     float chi_mk = l2_norm(dobs, dcalc_current);
-
     // nabla chi(m_k)
-    Point nabla_chi =
-      get_nabla_gradient(mk, dcalc_current, dobs);
+    Point nabla_chi = get_nabla_gradient(mk, dcalc_current, dobs);
 
-    // m_{k+1} = m_k - a_k nabla chi(m_k)
-    Point mk1 = {
-      .x = mk.x - a_k*nabla_chi.x, 
-      .y = mk.y - a_k*nabla_chi.y
-    };
-
-    // dcalc = G(m_{k+1})
-    float dcalc_1 = get_rosenbrock_value(mk1); 
-
-    // chi(m_{k+1})
-    float chi_mk1 = l2_norm(dobs, dcalc_1);
-
-    // Armijo condition
-    float grad_norm2 =
+    float grad_norm = sqrtf(
       nabla_chi.x*nabla_chi.x +
-      nabla_chi.y*nabla_chi.y;
+      nabla_chi.y*nabla_chi.y
+    );
+    // normalized descent direction
+    Point h_k = {
+      .x = -nabla_chi.x / grad_norm,
+      .y = -nabla_chi.y / grad_norm
+    };
+    float gTp = nabla_chi.x*h_k.x + nabla_chi.y*h_k.y;
 
-    float armijo_condition =
-      chi_mk - 1e-4f*a_k*grad_norm2;
+    float a_k = 1.0f;
 
-    if (chi_mk1 < armijo_condition)
+    // line search
+    for (int i = 0; i < 30; i++)
     {
-      m_current = mk1;
+      // m_{k+1} = m_k - a_k \nabla\chi(m_k)
+      Point mk1 = {
+        .x = mk.x + a_k*h_k.x,
+        .y = mk.y + a_k*h_k.y
+      };
+      // dcalc = G(m_{k+1})
+      float dcalc_1 = get_rosenbrock_value(mk1);
+      // chi(m_{k+1})
+      float chi_mk1 = l2_norm(dobs, dcalc_1);
 
-      model_updates_x[final_model_idx] = m_current.x;
-      model_updates_y[final_model_idx] = m_current.y;
-      final_model_idx++;
-    } else {
+      int armijo = chi_mk1 <= chi_mk + C1*a_k*gTp;
+      if (armijo)
+      {
+        m_current = mk1;
+
+        model_updates_x[final_model_idx] = m_current.x;
+        model_updates_y[final_model_idx] = m_current.y;
+        final_model_idx++;
+
+        break;
+      }
+
       a_k *= 0.5f;
     }
 
@@ -166,32 +153,34 @@ int main()
     }
   }
 
-END:
+  END:
 
-  PROFILE_END();
+    PROFILE_END();
 
-  printf(
-    "m_current: (%g, %g)\n",
-    m_current.x,
-    m_current.y
-  );
+    printf(
+      "m_current: (%g, %g)\n",
+      m_current.x,
+      m_current.y
+    );
 
-  contourplot_opt(
-    rosenbrock,
-    model_updates_x,
-    model_updates_y,
-    final_model_idx,
-    SIZE,
-    SIZE,
-    XMIN,
-    XMAX,
-    YMIN,
-    YMAX
-  );
+    contourplot_opt(
+      rosenbrock,
+      model_updates_x,
+      model_updates_y,
+      final_model_idx,
+      SIZE,
+      SIZE,
+      XMIN,
+      XMAX,
+      YMIN,
+      YMAX
+    );
 
-  free(model_updates_y);
-  free(model_updates_x);
-  free(rosenbrock);
+    free(model_updates_y);
+    free(model_updates_x);
+    free(rosenbrock);
 
   return 0;
 }
+
+

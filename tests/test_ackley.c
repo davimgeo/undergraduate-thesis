@@ -14,8 +14,8 @@
 #define PI 3.14159f
 #define E  2.71828f
 
-#define TOL 1e-8
-#define MAX_ITERATIONS 2001
+#define TOL 1e-8f
+#define MAX_ITERATIONS 10
 #define C1 1e-4f
 
 typedef struct Point 
@@ -62,10 +62,37 @@ Point get_nabla_gradient(Point p, float dcalc, float dobs)
 {
   Point nabla;
 
-  float r = (dcalc - dobs);
+  float r = dcalc - dobs;
 
-  nabla.x = (40.0f * p.x*p.x*p.x - 40.0f*p.x*p.y + 2.0f*p.x - 2.0f) * r;
-  nabla.y = (20.0f * (p.y - p.x*p.x)) * r;
+  float radius = sqrtf(0.5f * (p.x*p.x + p.y*p.y));
+
+  if (radius == 0.0f)
+  {
+    nabla.x = 0.0f;
+    nabla.y = 0.0f;
+    return nabla;
+  }
+
+  nabla.x =
+    (2.0f * p.x / radius) *
+    expf(-0.2f * radius) +
+    PI * sinf(2.0f * PI * p.x) *
+    expf(0.5f * (
+      cosf(2.0f * PI * p.x) +
+      cosf(2.0f * PI * p.y)
+    ));
+
+  nabla.y =
+    (2.0f * p.y / radius) *
+    expf(-0.2f * radius) +
+    PI * sinf(2.0f * PI * p.y) *
+    expf(0.5f * (
+      cosf(2.0f * PI * p.x) +
+      cosf(2.0f * PI * p.y)
+    ));
+
+  nabla.x *= r;
+  nabla.y *= r;
 
   return nabla;
 }
@@ -81,66 +108,106 @@ int main()
 
   float* ackley = get_ackley();
 
-  contourplot(ackley, SIZE, SIZE, XMIN, XMAX, YMIN, YMAX);
-
   /**************************** Steepest Descent ******************************/
 
-  Point mreal = {.x = 1.0f, .y = 1.0f}; // global minimum
+  Point mreal = {.x = 0.0f, .y = 0.0f}; // global minimum
   float dobs = get_ackley_value(mreal);
 
-  Point m_current  = {.x = -1.5f, .y = 0.5f};
+  Point m_current = {.x = -1.5f, .y = 0.5f};
+
   float dcalc_0 = get_ackley_value(m_current);
   float chi_m0 = l2_norm(dobs, dcalc_0);
-  //float a_k = 0.01f * MAX(m_current.x, m_current.y);
-  float a_k = 1.0f;
+
+  float* model_updates_x = (float*)malloc((MAX_ITERATIONS + 1) * sizeof(float));
+  float* model_updates_y = (float*)malloc((MAX_ITERATIONS + 1) * sizeof(float));
+
+  // Store initial model m0
+  int final_model_idx = 0;
+
+  model_updates_x[final_model_idx] = m_current.x;
+  model_updates_y[final_model_idx] = m_current.y;
+  final_model_idx++;
 
   for (int it = 0; it < MAX_ITERATIONS; it++) 
   {
-    /* mk = m_current
-     * dcalc = G(m_k)
-     * \chi(m_k) = ||dobs - dcalc||^2_2
-     * \nabla\chi(m_k) = \Delta d \nabla f */
+    // mk = m_current
     Point mk = m_current;
+    // dcalc = G(m_k)
     float dcalc_current = get_ackley_value(mk);
-    float chi_mk = l2_norm(dobs, dcalc_0);
+    // chi(m_k)
+    float chi_mk = l2_norm(dobs, dcalc_current);
+    // nabla chi(m_k)
     Point nabla_chi = get_nabla_gradient(mk, dcalc_current, dobs);
 
-    /* m_{k+1} = m_k - a_k\nabla\chi(m_k)
-     * dcalc = G(m_{k+1})
-     * \chi(m_{k+1}) = ||d_bs - dcalc||^2_2 */
-    Point mk1 = {
-      .x = mk.x - a_k*nabla_chi.x, 
-      .y = mk.y - a_k*nabla_chi.y
-    };
-    float dcalc_1 = get_ackley_value(mk1); 
-    float chi_mk1 = l2_norm(dobs, dcalc_1);
-   
-    /*\chi(m_{k+1}) <= \chi(m_k) - c_1 \alpha_k ||\nable\chi(m_k)||^2_2 */
-    float grad_norm2 = nabla_chi.x*nabla_chi.x + nabla_chi.y*nabla_chi.y;
-    float armijo_condition = chi_mk - C1*a_k*grad_norm2;
+    float grad_norm = sqrtf(
+      nabla_chi.x*nabla_chi.x +
+      nabla_chi.y*nabla_chi.y
+    );
+    if (grad_norm <= TOL) goto END;
 
-    if(chi_mk1 < armijo_condition)
+    // normalized descent direction
+    Point h_k = {
+      .x = -nabla_chi.x / grad_norm,
+      .y = -nabla_chi.y / grad_norm
+    };
+    float gTp = nabla_chi.x*h_k.x + nabla_chi.y*h_k.y;
+
+    float a_k = 1.0f;
+
+    // line search
+    for (int i = 0; i < 30; i++)
     {
-      m_current = mk1;
-      //a_k = 0.01f * MAX(m_current.x, m_current.y);
-      if(!(it % 10)) printf("m_current: (%g, %g)\n", m_current.x, m_current.y);
-    } else {
-      a_k /= 2.0f;
-      if(!(it % 10))printf("a_k: %g\n", a_k);
+      // m_{k+1} = m_k - a_k \nabla\chi(m_k)
+      Point mk1 = {
+        .x = mk.x + a_k*h_k.x,
+        .y = mk.y + a_k*h_k.y
+      };
+      // dcalc = G(m_{k+1})
+      float dcalc_1 = get_ackley_value(mk1);
+      // chi(m_{k+1})
+      float chi_mk1 = l2_norm(dobs, dcalc_1);
+
+      int armijo = chi_mk1 <= chi_mk + C1*a_k*gTp;
+      if (armijo)
+      {
+        m_current = mk1;
+
+        model_updates_x[final_model_idx] = m_current.x;
+        model_updates_y[final_model_idx] = m_current.y;
+        final_model_idx++;
+
+        break;
+      }
+
+      a_k *= 0.5f;
     }
 
-    if((chi_mk / chi_m0) <= TOL)
+    if ((chi_mk / chi_m0) <= TOL)
+    {
+      printf("Last Iteration: %d\n", it);
       goto END;
-      
+    }
   }
 
   END:
+
     PROFILE_END();
 
+    printf("m_current: (%g, %g)\n", m_current.x, m_current.y);
+
+    contourplot_opt(
+      ackley, model_updates_x, model_updates_y, final_model_idx,
+      SIZE, SIZE, XMIN, XMAX, YMIN, YMAX
+    );
+
+    free(model_updates_y);
+    free(model_updates_x);
     free(ackley);
 
   return 0;
 }
+
+
 
 
 

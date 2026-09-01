@@ -237,7 +237,7 @@ def contourplot_opt(
   ymin,
   ymax,
   ncontours=50,
-  fill=True
+  fill=False
 ):
   row, col = Z.shape
 
@@ -261,8 +261,8 @@ def contourplot_opt(
   min_x = x_axis[min_x_idx]
   min_y = y_axis[min_y_idx]
 
-  plt.scatter(min_x, min_y, marker="x", s=50, color="r", label="Global Minimum")
-
+  plt.scatter(x[0], y[0], marker="x", s=50, color="r",
+              label=f"Initial Model: {x[0], y[0]}")
   plt.plot(
     x,
     y,
@@ -270,6 +270,13 @@ def contourplot_opt(
     label="Optimization Path"
   )
 
+
+  plt.plot(x[-1], y[-1], "-o", color="g", markersize=7,
+           label=f"Final Model: {x[-1], y[-1]}")
+  plt.scatter(min_x, min_y, marker="x", s=50, color="b",
+              label=f"Global Minimum: {x_axis[min_x_idx], y_axis[min_y_idx]}")
+
   plt.legend(loc="upper left")
+  plt.title(f"Objective Function | Number of iteration: {x.size - 2}")
   plt.tight_layout()
   plt.show()

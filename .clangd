@@ -1,6 +1,6 @@
 CompileFlags:
   Add:
-    - -I/home/lum/coding/undergraduate-thesis/include
-    - -I/home/lum/coding/undergraduate-thesis/config
-    - -I/home/lum/coding/undergraduate-thesis/libs/include
-    - -I/home/lum/coding/undergraduate-thesis/src
+    - -I/home/davi/coding/undergraduate-thesis/include
+    - -I/home/davi/coding/undergraduate-thesis/config
+    - -I/home/davi/coding/undergraduate-thesis/libs/include
+    - -I/home/davi/coding/undergraduate-thesis/src
