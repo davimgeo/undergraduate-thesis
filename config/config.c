@@ -31,7 +31,7 @@ SpecsContext* Specs_Init(SpecsContext* specs)
     {
       .nx = 1701,
       .nz = 351,
-      .nb = 150,
+      .nb = 50,
 
       .interfaces_size = 1,
 

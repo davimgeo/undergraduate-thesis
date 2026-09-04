@@ -10,8 +10,8 @@ PYTHON_LIBS = $(shell python3-config --embed --ldflags)
 
 LIBS = -lfftw3f -lm
 
-MAIN = main.c
-# MAIN = tests/test_rickers.c
+#MAIN = main.c
+MAIN = smooth.c
 
 #SRCS = $(shell find . -name "*.c")
 SRCS = $(wildcard config/*.c) $(wildcard src/*.c) src/plot/plot.c
