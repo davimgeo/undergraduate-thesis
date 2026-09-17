@@ -35,8 +35,52 @@ def plot_seismogram(
 
   plt.show()
 
+def plot_seismogram_elastic(
+    calc_p: np.ndarray, 
+    vx: np.ndarray,
+    vz: np.ndarray,
+    dt: float, 
+    offset: int, 
+    perc=99
+) -> None:
+
+  nt, nrec = calc_p.shape
+  
+  tloc = np.linspace(0, nt - 1, 7, dtype=int)
+  tlab = np.around(tloc * dt, decimals=1)
+
+  xloc = np.linspace(0, nrec - 1, 7)
+  xlab = np.array(offset * 10 * xloc, dtype=int)
+
+  fig, ax = plt.subplots(nrows=1, ncols=3, figsize=(15, 8))
+
+  img = ax[0].imshow(calc_p, aspect="auto", cmap="Greys")
+  ax[0].set_title("Pressure", fontsize=15)
+  plt.colorbar(img, ax=ax[0])
+
+  img1 = ax[1].imshow(vx, aspect="auto", cmap="Greys")
+  ax[1].set_title("Vx", fontsize=15)
+  plt.colorbar(img1, ax=ax[1])
+
+  img2 = ax[2].imshow(vz, aspect="auto", cmap="Greys")
+  ax[2].set_title("Vz", fontsize=15)
+  plt.colorbar(img2, ax=ax[2])
+
+  for axs in ax:
+    axs.set_yticks(tloc)
+    axs.set_yticklabels(tlab)
+
+    axs.set_xticks(xloc)
+    axs.set_xticklabels(xlab)
+
+    axs.set_xlabel("Offset (m)", fontsize=13)
+    axs.set_ylabel("TWT (s)", fontsize=13)
+  
+  plt.tight_layout()
+  plt.show()
+
 def plot_model(model, perc=99) -> None:
-  _, ax = plt.subplots(figsize=(12, 5))
+  _, ax = plt.subplots(figsize=(12, 8))
 
   vmin = np.percentile(model, 100 - perc)
   vmax = np.percentile(model, perc)
@@ -72,10 +116,7 @@ def plot_model_geometry(
 
   model = model[nb:nb + nz, nb:nb + nx]
 
-  size  = (8, 10)
-  if nxx > nzz: size = (10, 8)
-
-  _, ax = plt.subplots(figsize=size)
+  _, ax = plt.subplots(figsize=(12, 5))
 
   vmin = np.percentile(model, 100 - perc)
   vmax = np.percentile(model, perc)
@@ -91,16 +132,10 @@ def plot_model_geometry(
     vmin=vmin, vmax=vmax
   )
 
-  ax.plot(recx, recz / dh, 'gv', label="Receivers", markersize=12)
-  ax.plot(srcx, srcz / dh, 'r*', markersize=12, label="Source")
+  ax.plot(recx, recz, 'gv', label="Receivers", markersize=12)
+  ax.plot(srcx, srcz, 'r*', markersize=12, label="Source")
 
   plt.colorbar(img, ax=ax, label="VP [m/s]")
-
-  ax.set_yticks(zloc)
-  ax.set_yticklabels(zlab)
-
-  ax.set_xticks(xloc)
-  ax.set_xticklabels(xlab)
 
   ax.set_xlabel("Distance [m]", fontsize=13)
   ax.set_ylabel("Depth [m]", fontsize=13)
@@ -109,27 +144,49 @@ def plot_model_geometry(
   plt.tight_layout()
   plt.show()
 
+def plot_image(image: np.ndarray, nb: int, dh: int, perc=99) -> None:
+  nzz, nxx = image.shape
+
+  nz = nzz - 2*nb
+  nx = nxx - 2*nb
+
+  xloc = np.linspace(0, nx - 1, 11, dtype=int)
+  xlab = np.array(xloc * dh, dtype=int)
+
+  zloc = np.linspace(0, nz - 1, 7, dtype=int)
+  zlab = np.array(zloc * dh, dtype=int)
+
+  fig, ax = plt.subplots(figsize=(12, 5)) 
+
+  img_data = image[nb:nb + nz, nb:nb + nx]
+
+  vmin = np.percentile(img_data, 100 - perc)
+  vmax = np.percentile(img_data, perc)
+ 
+  img = ax.imshow(
+      img_data,
+      aspect="auto",
+      cmap="Greys",
+      vmin=vmin,
+      vmax=vmax
+  )
+
+  ax.set_xticks(xloc)
+  ax.set_xticklabels(xlab)
+  ax.set_yticks(zloc)
+  ax.set_yticklabels(zlab)
+
+  ax.set_xlabel("Distance [m]", fontsize=13)
+  ax.set_ylabel("Depth [m]", fontsize=13)
+  ax.set_title("Image", fontsize=16)
+
+  plt.colorbar(img, ax=ax)
+  plt.show()
+
 def plot1d(arr: np.ndarray) -> None:
   _, ax = plt.subplots(nrows=1, ncols=1, figsize=(12, 5))
 
   ax.plot(arr)
-  
-  plt.tight_layout()
-  plt.show()
-
-def plot1d_xy(x: np.ndarray, y: np.ndarray) -> None:
-  _, ax = plt.subplots(nrows=1, ncols=1, figsize=(12, 5))
-
-  ax.plot(x, y)
-  
-  plt.tight_layout()
-  plt.show()
-
-def plot1d_compare(arr: np.ndarray, arr2: np.ndarray) -> None:
-  _, ax = plt.subplots(nrows=1, ncols=1, figsize=(12, 5))
-
-  ax.plot(arr)
-  ax.plot(arr2)
   
   plt.tight_layout()
   plt.show()
@@ -142,141 +199,43 @@ def plot2d(arr: np.ndarray) -> None:
   plt.tight_layout()
   plt.show()
 
-def plot3d(arr: np.ndarray, x: np.ndarray, y: np.ndarray) -> None:
-  x_grid, y_grid = np.meshgrid(x, y)
+def compare_diff(
+  model1: np.ndarray, 
+  model2: np.ndarray, 
+  title1=None,
+  title2=None
+  ) -> None:
 
-  fig = plt.figure(figsize=(14, 6))
+  if title1 is None:
+    title1 = "Image 1"
 
-  ax1 = fig.add_subplot(1, 2, 1, projection="3d")
-  ax2 = fig.add_subplot(1, 2, 2)
+  if title2 is None:
+    title2 = "Image 2"
 
-  surf = ax1.plot_surface(
-    x_grid,
-    y_grid,
-    arr,
-    cmap="viridis",
-    alpha=0.8
-  )
+  diff = model1 - model2
+  diff_norm = diff / np.max(np.abs(model1))
 
-  ax1.contour(
-    x_grid,
-    y_grid,
-    arr,
-    zdir="z",
-    offset=np.min(arr),
-    levels=20,
-    cmap="viridis"
-  )
+  vmin = min(model1.min(), model2.min())
+  vmax = max(model1.max(), model2.max())
 
-  ax1.set_xlabel(r"$x$")
-  ax1.set_ylabel(r"$y$")
-  ax1.set_zlabel(r"$f(x,y)$")
-  ax1.view_init(elev=15, azim=4)
+  _, axs = plt.subplots(nrows=1, ncols=3, figsize=(15, 5))
 
-  im = ax2.imshow(
-    arr,
-    extent=[x.min(), x.max(), y.min(), y.max()],
-    origin="lower",
-    cmap="viridis",
-    aspect="auto"
-  )
+  im0 = axs[0].imshow(model1, aspect='auto', cmap="Greys", vmin=vmin, vmax=vmax)
+  axs[0].set_title(title1)
+  plt.colorbar(im0, ax=axs[0])
 
-  ax2.set_xlabel(r"$x$")
-  ax2.set_ylabel(r"$y$")
+  im1 = axs[1].imshow(model2, aspect='auto', cmap="Greys", vmin=vmin, vmax=vmax)
+  axs[1].set_title(title2)
+  plt.colorbar(im1, ax=axs[1])
 
-  fig.colorbar(surf, ax=ax1, shrink=0.6)
-  fig.colorbar(im, ax=ax2)
+  im2 = axs[2].imshow(diff_norm, aspect='auto', cmap="Greys")
+  axs[2].set_title("Difference (%)")
+  plt.colorbar(im2, ax=axs[2])
+
+  rel_error = np.max(np.abs(diff)) / np.max(np.abs(diff_norm))
+  plt.suptitle(f"Relative Error: {rel_error * 100:.2f}%")
 
   plt.tight_layout()
+
   plt.show()
 
-def contourplot(
-  Z,
-  xmin,
-  xmax,
-  ymin,
-  ymax,
-  ncontours=50,
-  fill=False
-):
-  row, col = Z.shape
-
-  x = np.linspace(xmin, xmax, col)
-  y = np.linspace(ymin, ymax, row)
-
-  X, Y = np.meshgrid(x, y)
-
-  plt.figure(figsize=(10, 8))
-
-  if fill:
-    plt.contourf(X, Y, Z, ncontours)
-  else:
-    plt.contour(X, Y, Z, ncontours)
-
-  min_y_idx, min_x_idx = np.unravel_index(
-    np.argmin(Z),
-    Z.shape
-  )
-
-  min_x = x[min_x_idx]
-  min_y = y[min_y_idx]
-
-  plt.scatter(min_x, min_y, marker="x", s=50, color="r", label="Global Minimum")
-  #plt.scatter(1, 1, marker="x", s=50, color="b", label="Analytical Global Minimum")
-
-  plt.legend(loc="upper left")
-  plt.tight_layout()
-  plt.show()
-
-def contourplot_opt(
-  Z,
-  x,
-  y,
-  xmin,
-  xmax,
-  ymin,
-  ymax,
-  ncontours=50,
-  fill=False
-):
-  row, col = Z.shape
-
-  x_axis = np.linspace(xmin, xmax, col)
-  y_axis = np.linspace(ymin, ymax, row)
-
-  X, Y = np.meshgrid(x_axis, y_axis)
-
-  plt.figure(figsize=(10, 8))
-
-  if fill:
-    plt.contourf(X, Y, Z, ncontours)
-  else:
-    plt.contour(X, Y, Z, ncontours)
-
-  min_y_idx, min_x_idx = np.unravel_index(
-    np.argmin(Z),
-    Z.shape
-  )
-
-  min_x = x_axis[min_x_idx]
-  min_y = y_axis[min_y_idx]
-
-  plt.scatter(x[0], y[0], marker="x", s=50, color="r",
-              label=f"Initial Model: {x[0], y[0]}")
-  plt.plot(
-    x,
-    y,
-    marker="o",
-    label="Optimization Path"
-  )
-
-
-  plt.plot(x[-1], y[-1], "-o", color="g", markersize=7,
-           label=f"Final Model: {x[-1], y[-1]}")
-  plt.scatter(min_x, min_y, marker="x", s=50, color="b",
-              label=f"Global Minimum: {x_axis[min_x_idx], y_axis[min_y_idx]}")
-
-  plt.legend(loc="upper left")
-  plt.title(f"Objective Function | Number of iteration: {x.size - 2}")
-  plt.tight_layout()
-  plt.show()

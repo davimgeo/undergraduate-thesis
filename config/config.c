@@ -11,27 +11,27 @@ SpecsContext* Specs_Init(SpecsContext* specs)
     .wavelet =
     {
       .dt = 1e-3f,
-      .fmax = 30.0f,
-      .nt = 5001,
+      .fmax = 10.0f,
+      .nt = 4001,
       .tlag = 0.15,
     },
 
     .geometry =
     {
-      .line_length = 1701,
+      .line_length = 881,
 
-      .src_depth = 40,
-      .rec_depth = 0,
+      .src_depth = 50,
+      .rec_depth = 10,
 
-      .offset_rec = 5,
-      .offset_src = 50
+      .offset_rec = 8,
+      .offset_src = 22
     },
 
     .model =
     {
-      .nx = 1701,
+      .nx = 881,
       .nz = 351,
-      .nb = 50,
+      .nb = 100,
 
       .interfaces_size = 1,
 
@@ -41,13 +41,13 @@ SpecsContext* Specs_Init(SpecsContext* specs)
 
     .seismogram =
     {
-      .nt = 5001,
+      .nt = 4001,
       .dt = 1e-3f
     },
 
     .propagation =
     {
-      .nt = 5001,
+      .nt = 4001,
       .dt = 1e-3f,
       .dh = 10,
 

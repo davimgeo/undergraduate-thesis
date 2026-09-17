@@ -69,6 +69,24 @@ static inline float* read2d(const char* PATH, int row, int column)
   return arr;
 }
 
+static inline float* read_any(const char* PATH, int size) 
+{
+  float* arr = (float*)malloc(size * sizeof(float));
+
+  FILE* bin_data = fopen(PATH, "rb"); 
+  if (bin_data == NULL) 
+  {
+      printf("Could not read binary file.\n");
+      exit(-1);
+  }
+
+  fread(arr, sizeof(float), size, bin_data); 
+
+  fclose(bin_data);   
+
+  return arr;
+}
+
 static inline float* read2d_fortran(const char* PATH, int row, int column)
 {
 

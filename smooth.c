@@ -6,10 +6,11 @@
 #include "propagation.h"
 #include "plot.h"
 #include "fft.h"
+#include "IO.h"
 
-#define PI 3.1415f
+#define PI 3.14159265359f
 
-float* extent_model(float* model, int nx, int nz, int nb)
+float* extent_model2(float* model, int nx, int nz, int nb)
 {
   int nxx = nx + 2*nb;
   int nzz = nz + 2*nb;
@@ -110,8 +111,7 @@ float* gaussian_filter_2d(
   {
     for (int j = 0; j < col; j++)
     {
-      result[i * col + j] =
-        result_ext[(i + nb) * col_ext + (j + nb)];
+      result[i * col + j] = result_ext[(i + nb) * col_ext + (j + nb)];
     }
   }
 
@@ -244,12 +244,29 @@ int main()
   SpecsContext* specs = Specs_Init(NULL);
 
   model_t* model = Model_Init(NULL, &specs->model);
-  Model_Load(model, "data/vp_351x1701_10m.bin", 1701, 351);
+  Model_Load(model, "data/vp_351x1701_10m.bin", 1701, 351, 1);
 
-  //float* vp_smooth = running_mean(model->vp, kernel_size, nz, nx);
-  float* vp_smooth = gaussian_filter_2d(model->vp, dh, dh, 2e-3f, 3e-4f, 3.0f, model->nz, model->nx);
+  int nx = 881; int nz = 351;
 
-  plot2d(vp_smooth, model->nz, model->nx);
+  float* clipped_model = malloc(nx * nz * sizeof(float));
+
+  int x = (1701 - nx) / 2;
+  int z = (351 - nz) / 2;
+
+  for (int ii = 0; ii < nz; ii++) 
+  {
+    for (int jj = 0; jj < nx; jj++) 
+    {
+      clipped_model[ii * nx + jj] = model->vp[(ii + z) * 1701 + (jj + x)];
+    }
+  }
+
+  float* vp_smooth = gaussian_filter_2d(clipped_model, 25, 25, 2e-3f, 8e-4f, 3.0f, 351, 881);
+
+  plot2d(vp_smooth, nz, nx);
+
+  //write2d("m0_881x351_10m.bin", vp_smooth, sizeof(float), nz, nx);
+
 
   return 0;
 }
