@@ -261,11 +261,11 @@ int main()
     }
   }
 
-  float* vp_smooth = gaussian_filter_2d(clipped_model, 25, 25, 2e-3f, 8e-4f, 3.0f, 351, 881);
+  float* vp_smooth = gaussian_filter_2d(clipped_model, 10, 10, 0.002, 0.0003, 3.0f, 351, 881);
 
   plot2d(vp_smooth, nz, nx);
 
-  //write2d("m0_881x351_10m.bin", vp_smooth, sizeof(float), nz, nx);
+  write2d("m0_881x351_10m.bin", vp_smooth, sizeof(float), nz, nx);
 
 
   return 0;

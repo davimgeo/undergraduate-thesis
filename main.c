@@ -33,7 +33,6 @@ float* get_nabla_gradient(float* mk, const float* dobs, SpecsContext* specs)
 
   model_t* model = Model_Init(NULL, &specs->model);
   Model_Set(model, mk);
-  plot2d(mk, 351, 881);
   Model_Extent(model);
 
   seismogram_t* seis = Seismogram_Init(NULL, &specs->seismogram, geom->nrec, 0);
@@ -54,8 +53,12 @@ float* get_nabla_gradient(float* mk, const float* dobs, SpecsContext* specs)
   {
     for (int j = 0; j < model->nx; ++j)
     {
-      nabla_chi[(size_t)i * model->nx + j] =
-        rtm->image[(size_t)(i + model->nb) * model->nxx + (j + model->nb)];
+      size_t idx_im = (size_t)(i + model->nb) * model->nxx + (j + model->nb);
+      size_t idx_nabla = (size_t)i * model->nx + j;
+
+      float v = mk[idx_nabla];
+
+      nabla_chi[idx_nabla] = rtm->image[idx_im] * (-2.0f / (v*v*v));
     }
   }
 
