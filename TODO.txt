@@ -1,1 +1,0 @@
-Adicionar cálculo de função objetivo entre tiros. Isto é, adicionar um loop a mais para tiro. Colocar dentro do loop de modelagem.
