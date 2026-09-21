@@ -184,13 +184,13 @@ void save_current(float* m_current, SpecsContext* specs, int it)
   write2d(filename, m_current, sizeof(float), 351, 881);
 }
 
-float get_GTP(const float* nabla_chi, float grad_norm, size_t size)
+float get_GTP(const float* nabla_chi, size_t size)
 {
   float gTp = 0.0;
 
   for (size_t i = 0; i < size; i++)
   {
-    float h_k = -nabla_chi[i] / grad_norm;
+    float h_k = -nabla_chi[i];
 
     gTp += nabla_chi[i] * h_k;
   }
