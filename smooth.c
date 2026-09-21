@@ -237,8 +237,7 @@ float* running_mean(
 
 int main()
 {
-  int kernel_size = 70;
-  
+  int dh_old = 10;
   int dh = 25;
 
   SpecsContext* specs = Specs_Init(NULL);
@@ -246,27 +245,45 @@ int main()
   model_t* model = Model_Init(NULL, &specs->model);
   Model_Load(model, "data/vp_351x1701_10m.bin", 1701, 351, 1);
 
-  int nx = 881; int nz = 351;
+  int nx_old = 1701;
+  int nz_old = 351;
 
-  float* clipped_model = malloc(nx * nz * sizeof(float));
+  int nx = ((nx_old - 1) * dh_old) / dh + 1;
+  int nz = ((nz_old - 1) * dh_old) / dh + 1;
 
-  int x = (1701 - nx) / 2;
-  int z = (351 - nz) / 2;
+  printf("nx = %d, nz = %d\n", nx, nz);
 
-  for (int ii = 0; ii < nz; ii++) 
+  float* resized_model = malloc((size_t)nx * nz * sizeof(float));
+
+  for (int ii = 0; ii < nz; ii++)
   {
-    for (int jj = 0; jj < nx; jj++) 
+    int i_old = (int)roundf((float)(ii * dh) / dh_old);
+
+    for (int jj = 0; jj < nx; jj++)
     {
-      clipped_model[ii * nx + jj] = model->vp[(ii + z) * 1701 + (jj + x)];
+      int j_old = (int)roundf((float)(jj * dh) / dh_old);
+
+      resized_model[ii * nx + jj] =
+        model->vp[i_old * nx_old + j_old];
     }
   }
 
-  float* vp_smooth = gaussian_filter_2d(clipped_model, 25, 25, 2e-3f, 8e-4f, 3.0f, 351, 881);
+  write2d("marmousi_real_141x681x_dh25m.bin.bin", resized_model, sizeof(float), nz, nx);
+
+  float* vp_smooth = gaussian_filter_2d(resized_model, dh, dh, 0.002, 0.0003, 3.0f, nz, nx);
+  for (int ii = 0; ii < 18; ii++)
+  {
+    for (int jj = 0; jj < nx; jj++)
+    {
+      vp_smooth[ii * nx + jj] = 1500.0f;
+    }
+  }
 
   plot2d(vp_smooth, nz, nx);
 
-  //write2d("m0_881x351_10m.bin", vp_smooth, sizeof(float), nz, nx);
+  write2d("m0.bin", vp_smooth, sizeof(float), nz, nx);
 
+  free(resized_model);
 
   return 0;
 }

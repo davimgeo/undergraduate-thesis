@@ -11,11 +11,11 @@
 #include "plot.h"
 
 #define NT 4001
-#define NREC 111
-#define NSHOT 41
+#define NREC 114
+#define NSHOT 43
 
-#define TOL 1e-8
-#define C1 1e-4
+#define TOL 1e-8f
+#define C1 1e-4f
 
 #define MAX_ITERATIONS 20
 #define MAX_LINE_SEARCH 10
@@ -26,6 +26,7 @@ float* get_nabla_gradient(float* mk, const float* dobs, SpecsContext* specs)
 
   geometry_t* geom = Geometry_InitCreate(NULL, &specs->geometry);
   Geometry_Create(geom, 0);
+  //printf("%d\n", geom->nsrc);
 
   wavelet_t* wave = Wavelet_Init(NULL, &specs->wavelet);
   Wavelet_Create(wave);
@@ -33,7 +34,6 @@ float* get_nabla_gradient(float* mk, const float* dobs, SpecsContext* specs)
 
   model_t* model = Model_Init(NULL, &specs->model);
   Model_Set(model, mk);
-  plot2d(mk, 351, 881);
   Model_Extent(model);
 
   seismogram_t* seis = Seismogram_Init(NULL, &specs->seismogram, geom->nrec, 0);
@@ -54,8 +54,12 @@ float* get_nabla_gradient(float* mk, const float* dobs, SpecsContext* specs)
   {
     for (int j = 0; j < model->nx; ++j)
     {
-      nabla_chi[(size_t)i * model->nx + j] =
-        rtm->image[(size_t)(i + model->nb) * model->nxx + (j + model->nb)];
+      size_t idx_im = (size_t)(i + model->nb) * model->nxx + (j + model->nb);
+      size_t idx_nabla = (size_t)i * model->nx + j;
+
+      float v = mk[idx_nabla];
+
+      nabla_chi[idx_nabla] = rtm->image[idx_im] * (-2.0f / (v*v*v));
     }
   }
 
@@ -85,7 +89,7 @@ float* get_dcalc(float* mk, SpecsContext* specs)
   model_t* model = Model_Init(NULL, &specs->model);
   Model_Set(model, mk);
   Model_Extent(model);
-  
+
   for (int ishot = 0; ishot < NSHOT; ++ishot)
   {
     geometry_t* geom = Geometry_InitCreate(NULL, &specs->geometry);
@@ -104,6 +108,7 @@ float* get_dcalc(float* mk, SpecsContext* specs)
       model, geom, wave, seis,
       PROPAGATION_ACOUSTIC
     );
+
     Propagation_Run(prop, 0);
 
     memcpy(
@@ -130,9 +135,10 @@ float l2_norm(const float* dcalc, const float* dobs, int nt, int nrec, int nshot
 
   for(int ishot = 0; ishot < nshot; ++ishot)
   {
-   // get specific shot from dobs/dcalc
-   const float* u_s = dcalc + ishot * nt * nrec; 
-   const float* u_o = dobs + ishot * nt * nrec; 
+    // get specific shot from dobs/dcalc
+    const float* u_s = dcalc + ishot * nt * nrec;
+    const float* u_o = dobs + ishot * nt * nrec;
+    //plot2d(u_o, nt, nrec);
 
     for (int irec = 0; irec < nrec; ++irec)
     {
@@ -141,6 +147,7 @@ float l2_norm(const float* dcalc, const float* dobs, int nt, int nrec, int nshot
         int idx = t * nrec + irec;
 
         float r = u_s[idx] - u_o[idx];
+        //printf("%g\n", u_o[idx]);
 
         result += r * r;
       }
@@ -181,7 +188,7 @@ float get_GTP(const float* nabla_chi, float grad_norm, size_t size)
 {
   float gTp = 0.0;
 
-  for (size_t i = 0; i < size; i++) 
+  for (size_t i = 0; i < size; i++)
   {
     float h_k = -nabla_chi[i] / grad_norm;
 
@@ -189,6 +196,23 @@ float get_GTP(const float* nabla_chi, float grad_norm, size_t size)
   }
 
   return gTp;
+}
+
+float get_initial_alpha(float* model, int row, int col)
+{
+  float max = model[0];
+  float min = model[0];
+
+  for(int i = 0; i < row * col; i++)
+  {
+    if(model[i] > max)
+      max = model[i];
+
+    if(model[i] < min)
+      min = model[i];
+  }
+
+  return 0.01f * (max - min);
 }
 
 int main()
@@ -199,23 +223,23 @@ int main()
 
   size_t model_size = (size_t)specs->model.nx * specs->model.nz;
 
+  float* m_real = read2d("data/FWI/marmousi_real_141x681x_dh25m.bin", 141, 681);
+  //plot2d(m_real, 141, 681);
+
+  //float* dobs = get_dcalc(m_real, specs);
+  //write1d("data/FWI/dobs.bin", dobs, sizeof(float), NT * NREC * NSHOT);
   float* dobs = read_any("data/FWI/dobs.bin", NT * NREC * NSHOT);
 
-  float* m0 = read2d("data/FWI/m0_881x351_10m.bin", 881, 351);
-  //float* m0 = read_any("data/FWI/m_009.bin", 881 * 351);
+  float* m0 = read2d_fortran("data/FWI/m0.bin", 141, 681);
   float* dcalc_0 = read_any("data/FWI/dcalc_0.bin", NT * NREC * NSHOT);
   float chi_m0 = l2_norm(dcalc_0, dobs, NT, NREC, NSHOT);
-
-  plot2d(m0, 351, 881);
 
   float* m_current = malloc(model_size * sizeof(float));
   float* mk1 = malloc(model_size * sizeof(float));
 
   memcpy(m_current, m0, model_size * sizeof(float));
 
-  printf("chi_m0 = %.12e\n", chi_m0);
-
-  for (int it = 0; it < MAX_ITERATIONS; it++) 
+  for (int it = 0; it < MAX_ITERATIONS; it++)
   {
     printf("\nIteration %d\n", it);
 
@@ -225,15 +249,18 @@ int main()
     float* dcalc_current = get_dcalc(mk, specs);
     // chi(m_k)
     float chi_mk = l2_norm(dcalc_current, dobs, NT, NREC, NSHOT);
+    printf("chi_mk: %g\n", chi_mk);
+
     // nabla chi(m_k)
     float* nabla_chi = get_nabla_gradient(mk, dobs, specs);
+    //plot2d(nabla_chi, 141, 681);
 
     // normalized descent direction
     float grad_norm = gradient_norm(nabla_chi, model_size);
-    float gTp = get_GTP(nabla_chi, grad_norm, model_size);
+    float gTp = grad_norm * get_GTP(nabla_chi, grad_norm, model_size);
 
-    float a_k = 35.0f;
-    //float a_k = 1.0f;
+    float a_k = get_initial_alpha(mk, 141, 681);
+    printf("alpha_0: %f\n", a_k);
 
     int accepted = 0;
 
@@ -242,21 +269,26 @@ int main()
     {
       for (size_t i = 0; i < model_size; ++i)
       {
-        // m_{k+1} = m_k - a_k \nabla\chi(m_k)
+        // m_{k+1} = m_k - a_k nabla_chi(m_k)
         mk1[i] = mk[i] - a_k * (nabla_chi[i] / grad_norm);
+        printf("%g\n", nabla_chi[i] / grad_norm);
       }
 
       // dcalc = G(m_{k+1})
       float* dcalc_1 = get_dcalc(mk1, specs);
+
       // chi(m_{k+1})
       float chi_mk1 = l2_norm(dcalc_1, dobs, NT, NREC, NSHOT);
+      printf("chi_mk1: %g\n", chi_mk1);
+      printf("armijo: %g\n", chi_mk + C1*a_k*gTp);
 
-      int armijo = chi_mk1 <= chi_mk + C1*(double)a_k * gTp;
+      int armijo = chi_mk1 <= chi_mk + C1*a_k*gTp;
+
       if (armijo)
       {
         printf("ACCEPTED\n");
 
-        compare_diff(m_current, mk1, 351, 881, "m_current", "mk1");
+        compare_diff(m_current, mk1, 141, 681, "m_current", "mk1");
 
         float* temp = m_current;
         m_current = mk1;
@@ -306,4 +338,3 @@ int main()
 
   return 0;
 }
-
