@@ -213,7 +213,7 @@ def compare_diff(
     title2 = "Image 2"
 
   diff = model1 - model2
-  diff_norm = diff / np.max(np.abs(model1))
+  #diff_norm = diff / np.max(np.abs(model1))
 
   vmin = min(model1.min(), model2.min())
   vmax = max(model1.max(), model2.max())
@@ -228,12 +228,9 @@ def compare_diff(
   axs[1].set_title(title2)
   plt.colorbar(im1, ax=axs[1])
 
-  im2 = axs[2].imshow(diff_norm, aspect='auto', cmap="Greys")
-  axs[2].set_title("Difference (%)")
+  im2 = axs[2].imshow(diff, aspect='auto', cmap="Greys")
+  axs[2].set_title("Difference")
   plt.colorbar(im2, ax=axs[2])
-
-  rel_error = np.max(np.abs(diff)) / np.max(np.abs(diff_norm))
-  plt.suptitle(f"Relative Error: {rel_error * 100:.2f}%")
 
   plt.tight_layout()
 

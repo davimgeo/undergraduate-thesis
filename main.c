@@ -12,7 +12,7 @@
 
 #define NT 4001
 #define NREC 114
-#define NSHOT 43
+#define NSHOT 46
 
 #define TOL 1e-8f
 #define C1 1e-4f
@@ -26,7 +26,6 @@ float* get_nabla_gradient(float* vp, const float* dobs, SpecsContext* specs)
 
   geometry_t* geom = Geometry_InitCreate(NULL, &specs->geometry);
   Geometry_Create(geom, 0);
-  //printf("%d\n", geom->nsrc);
 
   wavelet_t* wave = Wavelet_Init(NULL, &specs->wavelet);
   Wavelet_Create(wave);
@@ -129,9 +128,15 @@ float* get_dcalc(float* vp, SpecsContext* specs)
   return dcalc;
 }
 
-float l2_norm(const float* dcalc, const float* dobs, int nt, int nrec, int nshot)
+double l2_norm(
+  const float* dcalc,
+  const float* dobs,
+  int nt,
+  int nrec,
+  int nshot
+)
 {
-  float result = 0.0;
+  double result = 0.0;
 
   for(int ishot = 0; ishot < nshot; ++ishot)
   {
@@ -146,7 +151,7 @@ float l2_norm(const float* dcalc, const float* dobs, int nt, int nrec, int nshot
       {
         int idx = t * nrec + irec;
 
-        float r = u_s[idx] - u_o[idx];
+        double r = (double)u_s[idx] - (double)u_o[idx];
         //printf("%g\n", u_o[idx]);
 
         result += r * r;
@@ -157,17 +162,18 @@ float l2_norm(const float* dcalc, const float* dobs, int nt, int nrec, int nshot
   return 0.5f * result;
 }
 
-float gradient_norm(const float* gradient, size_t size)
+float gradient_scale(const float* gradient, size_t size)
 {
-  float result = 0.0;
+  float scale = 0.0f;
 
   for (size_t i = 0; i < size; ++i)
   {
-    float g = gradient[i];
-    result += g * g;
+    float g = fabsf(gradient[i]);
+
+    if (g > scale) scale = g;
   }
 
-  return sqrtf(result);
+  return scale;
 }
 
 void save_current(float* m_current, SpecsContext* specs, int it)
@@ -181,18 +187,18 @@ void save_current(float* m_current, SpecsContext* specs, int it)
     it + 1
   );
 
-  write2d(filename, m_current, sizeof(float), 351, 881);
+  write2d(filename, m_current, sizeof(float), 141, 681);
 }
 
-float get_GTP(const float* nabla_chi, size_t size)
+double get_GTP(const float* nabla_chi, size_t size)
 {
-  float gTp = 0.0;
+  double gTp = 0.0;
 
   for (size_t i = 0; i < size; i++)
   {
-    float h_k = -nabla_chi[i];
+    double h_k = -(double)nabla_chi[i];
 
-    gTp += nabla_chi[i] * h_k;
+    gTp += (double)nabla_chi[i] * h_k;
   }
 
   return gTp;
@@ -234,7 +240,7 @@ float get_initial_alpha(float* model, int row, int col)
       min = model[i];
   }
 
-  return 0.01f * (max - min);
+  return 0.15f * (max - min);
 }
 
 int main()
@@ -245,14 +251,21 @@ int main()
 
   size_t model_size = (size_t)specs->model.nx * specs->model.nz;
 
-  float* m_real = read2d("data/FWI/marmousi_real_141x681x_dh25m.bin", 141, 681);
-  //plot2d(m_real, 141, 681);
+  float* m_real = read2d(
+    "data/FWI/marmousi_real_141x681x_dh25m.bin",
+    141,
+    681
+  );
+  plot2d(m_real, 141, 681);
+  float* m10 = read2d("data/FWI/m_10.bin", 141, 681);
+  plot2d(m10, 141, 681);
 
   float* dobs = read_any("data/FWI/dobs.bin", NT * NREC * NSHOT);
 
-  float* m0 = read2d_fortran("data/FWI/m0.bin", 141, 681);
+  float* m0 = read2d("data/FWI/m0.bin", 141, 681);
+  compare_diff(m0, m10, 141, 681, "m0", "m10");
   float* dcalc_0 = read_any("data/FWI/dcalc_0.bin", NT * NREC * NSHOT);
-  float chi_m0 = l2_norm(dcalc_0, dobs, NT, NREC, NSHOT);
+  double chi_m0 = l2_norm(dcalc_0, dobs, NT, NREC, NSHOT);
 
   float* vp_current = malloc(model_size * sizeof(float));
   float* vp_k1 = malloc(model_size * sizeof(float));
@@ -274,20 +287,22 @@ int main()
     float* dcalc_current = get_dcalc(vp_current, specs);
 
     // chi(m_k)
-    float chi_mk = l2_norm(dcalc_current, dobs, NT, NREC, NSHOT);
-    printf("chi_mk: %g\n", chi_mk);
+    double chi_mk = l2_norm(dcalc_current, dobs, NT, NREC, NSHOT);
 
     // nabla chi(m_k)
     float* nabla_chi = get_nabla_gradient(vp_current, dobs, specs);
     plot2d(nabla_chi, 141, 681);
+    write2d("nabla_chi_141x681.bin", nabla_chi, sizeof(float), 141, 681);
 
     // normalized descent direction
-    float grad_norm = gradient_norm(nabla_chi, model_size);
-    for (size_t i = 0; i < model_size; i++) nabla_chi[i] /= grad_norm;
-    float gTp = grad_norm * get_GTP(nabla_chi, model_size);
+    float grad_scale = gradient_scale(nabla_chi, model_size);
 
+    for (size_t i = 0; i < model_size; i++)
+      nabla_chi[i] /= grad_scale;
+
+    double gTp = (double)grad_scale * get_GTP(nabla_chi, model_size);
     float a_k = get_initial_alpha(mk, 141, 681);
-    printf("alpha_0: %f\n", a_k);
+    printf("alpha_0: %g\n", a_k);
 
     int accepted = 0;
 
@@ -298,7 +313,6 @@ int main()
       {
         // m_{k+1} = m_k - a_k*nabla_chi(m_k)
         mk1[i] = mk[i] - a_k * nabla_chi[i];
-        printf("%g\n", nabla_chi[i]);
       }
 
       get_velocity_from_slowness(mk1, vp_k1, 141, 681);
@@ -307,16 +321,18 @@ int main()
       float* dcalc_1 = get_dcalc(vp_k1, specs);
 
       // chi(m_{k+1})
-      float chi_mk1 = l2_norm(dcalc_1, dobs, NT, NREC, NSHOT);
-      printf("chi_mk1: %g\n", chi_mk1);
-      printf("armijo: %g\n", chi_mk + C1*a_k*gTp);
+      double chi_mk1 = l2_norm(dcalc_1, dobs, NT, NREC, NSHOT);
+      double armijo_rhs = chi_mk + C1 * (double)a_k * gTp;
 
-      int armijo = chi_mk1 <= chi_mk + C1*a_k*gTp;
+      printf("chi_mk1: %.15g\n", chi_mk1);
+      printf("armijo: %.15g\n", armijo_rhs);
+
+      int armijo = chi_mk1 <= armijo_rhs;
       if (armijo)
       {
         printf("ACCEPTED\n");
 
-        compare_diff(vp_current, vp_k1, 141, 681, "m_current", "mk1");
+        compare_diff(vp_current, vp_k1, 141, 681, "vp_current", "vp_k1");
 
         float* temp = m_current;
         m_current = mk1;
