@@ -13,15 +13,15 @@ SpecsContext* Specs_Init(SpecsContext* specs)
       .dt = 1e-3f,
       .fmax = 10.0f,
       .nt = 4001,
-      .tlag = 0.15,
+      .tlag = 0.30f,
     },
 
     .geometry =
     {
       .line_length = 681,
 
-      .src_depth = 50,
-      .rec_depth = 10,
+      .src_depth = 10,
+      .rec_depth = 0,
 
       .offset_rec = 6,
       .offset_src = 15
@@ -35,7 +35,7 @@ SpecsContext* Specs_Init(SpecsContext* specs)
 
       .interfaces_size = 1,
 
-      .interfaces = {350},
+      .interfaces = {72},
       .values = {1500.0f, 2000.0f}
     },
 
@@ -57,3 +57,5 @@ SpecsContext* Specs_Init(SpecsContext* specs)
 
   return specs;
 }
+
+

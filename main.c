@@ -14,11 +14,11 @@
 #define NREC 114
 #define NSHOT 46
 
-#define TOL 1e-8f
+#define TOL 1e-6f
 #define C1 1e-4f
 
 #define MAX_ITERATIONS 20
-#define MAX_LINE_SEARCH 10
+#define MAX_LINE_SEARCH 20
 
 float* get_nabla_gradient(float* vp, const float* dobs, SpecsContext* specs)
 {
@@ -29,7 +29,6 @@ float* get_nabla_gradient(float* vp, const float* dobs, SpecsContext* specs)
 
   wavelet_t* wave = Wavelet_Init(NULL, &specs->wavelet);
   Wavelet_Create(wave);
-  Wavelet_SecondDerivative(wave);
 
   model_t* model = Model_Init(NULL, &specs->model);
   Model_Set(model, vp);
@@ -47,6 +46,8 @@ float* get_nabla_gradient(float* vp, const float* dobs, SpecsContext* specs)
   rtm_t* rtm = RTM_Init(NULL, prop);
   RTMv2_Run(rtm, dobs);
 
+  plot_image(rtm, model, 10);
+
   float* nabla_chi = malloc(model_size * sizeof(float));
 
   for (int i = 0; i < model->nz; ++i)
@@ -56,9 +57,10 @@ float* get_nabla_gradient(float* vp, const float* dobs, SpecsContext* specs)
       size_t idx_im = (size_t)(i + model->nb) * model->nxx + (j + model->nb);
       size_t idx_nabla = (size_t)i * model->nx + j;
 
-      float v = vp[idx_nabla];
-
-      nabla_chi[idx_nabla] = rtm->image[idx_im];
+      if (i < 20)
+        nabla_chi[idx_nabla] = 0.0f;
+      else
+        nabla_chi[idx_nabla] = rtm->image[idx_im];
     }
   }
 
@@ -240,7 +242,7 @@ float get_initial_alpha(float* model, int row, int col)
       min = model[i];
   }
 
-  return 0.15f * (max - min);
+  return 0.02f * (max - min);
 }
 
 int main()
@@ -256,15 +258,17 @@ int main()
     141,
     681
   );
-  plot2d(m_real, 141, 681);
-  float* m10 = read2d("data/FWI/m_10.bin", 141, 681);
-  plot2d(m10, 141, 681);
+  //plot2d(m_real, 141, 681);
+  //float* m10 = read2d("data/FWI/m_10.bin", 141, 681);
 
   float* dobs = read_any("data/FWI/dobs.bin", NT * NREC * NSHOT);
+  //float* dobs = get_dcalc(m_real, specs);
+  //write1d("data/dobs.bin", dobs, sizeof(float), NT * NREC * NSHOT);
 
   float* m0 = read2d("data/FWI/m0.bin", 141, 681);
-  compare_diff(m0, m10, 141, 681, "m0", "m10");
   float* dcalc_0 = read_any("data/FWI/dcalc_0.bin", NT * NREC * NSHOT);
+  //float* dcalc_0 = get_dcalc(m0, specs);
+  //write1d("data/dcalc_0.bin", dcalc_0, sizeof(float), NT * NREC * NSHOT);
   double chi_m0 = l2_norm(dcalc_0, dobs, NT, NREC, NSHOT);
 
   float* vp_current = malloc(model_size * sizeof(float));
@@ -284,15 +288,22 @@ int main()
     float* mk = m_current;
 
     // dcalc = G(m_k)
-    float* dcalc_current = get_dcalc(vp_current, specs);
+    float* dcalc_current;
+    if(it == 0)
+      dcalc_current = dcalc_0;
+    else
+      dcalc_current = get_dcalc(vp_current, specs);
 
     // chi(m_k)
     double chi_mk = l2_norm(dcalc_current, dobs, NT, NREC, NSHOT);
 
     // nabla chi(m_k)
-    float* nabla_chi = get_nabla_gradient(vp_current, dobs, specs);
-    plot2d(nabla_chi, 141, 681);
-    write2d("nabla_chi_141x681.bin", nabla_chi, sizeof(float), 141, 681);
+    //float* nabla_chi;
+    //if(it == 0)
+    //  nabla_chi = read2d("nabla_chi_141x681.bin", 141, 681);
+    //else
+    //  nabla_chi = get_nabla_gradient(vp_current, dobs, specs);
+    float *nabla_chi = get_nabla_gradient(vp_current, dobs, specs);
 
     // normalized descent direction
     float grad_scale = gradient_scale(nabla_chi, model_size);
@@ -311,13 +322,11 @@ int main()
     {
       for (size_t i = 0; i < model_size; ++i)
       {
-        // m_{k+1} = m_k - a_k*nabla_chi(m_k)
         mk1[i] = mk[i] - a_k * nabla_chi[i];
       }
 
       get_velocity_from_slowness(mk1, vp_k1, 141, 681);
 
-      // dcalc = G(m_{k+1})
       float* dcalc_1 = get_dcalc(vp_k1, specs);
 
       // chi(m_{k+1})
