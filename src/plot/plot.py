@@ -21,8 +21,8 @@ def plot_seismogram(
 
   fig, ax = plt.subplots(figsize=(10, 8))
 
-  img = ax.imshow(seismogram, aspect="auto", cmap="Greys",
-                    vmin=scale_min, vmax=scale_max)
+  img = ax.imshow(seismogram, aspect="auto", cmap="Greys", 
+                  vmin=scale_min, vmax=scale_max)
 
   ax.set_yticks(tloc)
   ax.set_yticklabels(tlab)

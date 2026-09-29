@@ -1,170 +1,62 @@
 import matplotlib.pyplot as plt
 import numpy as np
-
-class Plotting:
   
-  def load(self, path: str, height: int, weight: int) -> np.ndarray:
-    return np.fromfile(
-      path, dtype=np.float32, count=height*weight
-    ).reshape([height, weight], order='F')
+def load(path: str, height: int, weight: int) -> np.ndarray:
+  return np.fromfile(
+    path, dtype=np.float32, count=height*weight
+  ).reshape([height, weight], order='C')
 
-  def plot(self, model, perc=99) -> None:
-    _, ax = plt.subplots(figsize=(12, 5))
+nz = 141
+nx = 681
+dh = 2.5
 
-    vmin = np.percentile(model, 100 - perc)
-    vmax = np.percentile(model, perc)
+nrec = 114
+nsrc = 46
 
-    img = ax.imshow(
-      model, aspect="auto", cmap="Greys", 
-      vmin=vmin, vmax=vmax
-    )
+marmousi_real = load("data/FWI/marmousi_real_141x681x_dh25m.bin", nz, nx)
+marmousi_inverted = load("data/FWI/m_17.bin", nz, nx)
+marmousi_initial = load("data/FWI/m0.bin", nz, nx)
 
-    plt.colorbar(img, ax=ax)
+trace = 340
 
-    plt.tight_layout()
-    plt.show()
+fig, ax = plt.subplots(
+  nrows=1,
+  ncols=2,
+  figsize=(14, 6),
+  gridspec_kw={"width_ratios": [1, 5]}
+)
 
-  def compare(
-    self, 
-    model1: np.ndarray, 
-    model2: np.ndarray, 
-    title1=None,
-    title2=None,
-    ) -> None:
+ax[0].plot(marmousi_real[:, trace], np.arange(nz), label="Real Model")
+ax[0].plot(marmousi_inverted[:, trace], np.arange(nz), label="Inverted Model")
+ax[0].plot(marmousi_initial[:, trace], np.arange(nz), label="Initial Model")
 
-    if title1 is None:
-      title1 = "Image 1"
+ax[0].set_xlabel("Velocity [m/s]")
+ax[0].xaxis.set_label_position("top")
+ax[0].xaxis.tick_top()
 
-    if title2 is None:
-      title2 = "Image 2"
+ax[0].set_ylabel("Depth [m]")
 
-    perc = 99
+ax[0].grid(True)
+ax[0].invert_yaxis()
+ax[0].legend()
 
-    vmin1 = np.percentile(model1, 100 - perc)
-    vmax1 = np.percentile(model1, perc)
+recx = np.linspace(0, nx - 1, nrec)
+recz = 20 * np.ones(nrec)
 
-    vmin2 = np.percentile(model2, 100 - perc)
-    vmax2 = np.percentile(model2, perc)
+srcx = np.linspace(0, nx - 1, nsrc)
+srcz = 0 * np.ones(nsrc)
 
-    _, axs = plt.subplots(nrows=2, ncols=1, figsize=(15, 6))
+img = ax[1].imshow(marmousi_initial, aspect="auto", cmap="jet")
+ax[1].axvline(trace, linestyle="--")
 
-    im0 = axs[0].imshow(
-      model1, aspect='auto', cmap="Greys", 
-      vmin=vmin1, vmax=vmax1
-    )
-    axs[0].set_title(title1)
-    plt.colorbar(im0, ax=axs[0])
+ax[1].plot(recx, recz, 'gv', label="Receivers", markersize=12)
+ax[1].plot(srcx, srcz, 'r*', markersize=12, label="Source")
 
-    im1 = axs[1].imshow(
-      model2, aspect='auto', cmap="Greys", 
-      vmin=vmin2, vmax=vmax2
-    )
-    axs[1].set_title(title2)
-    plt.colorbar(im1, ax=axs[1])
+plt.colorbar(img, ax=ax[1], label="VP [m/s]")
 
-    plt.tight_layout()
-    plt.show()
+ax[1].set_title("Initial Model", fontsize=13)
 
-  def compare_model_and_traces(
-    self, 
-    model1: np.ndarray, 
-    model2: np.ndarray, 
-    trace_number: int,
-    title1=None,
-    title2=None,
-    ) -> None:
+ax[1].legend()
+plt.tight_layout()
+plt.show()
 
-    if title1 is None:
-      title1 = "Image 1"
-
-    if title2 is None:
-      title2 = "Image 2"
-
-    nz, nx = model1.shape
-
-    perc = 99
-
-    vmin1 = np.percentile(model1, 100 - perc)
-    vmax1 = np.percentile(model1, perc)
-
-    vmin2 = np.percentile(model2, 100 - perc)
-    vmax2 = np.percentile(model2, perc)
-
-    _, axs = plt.subplots(nrows=1, ncols=3, figsize=(15, 5))
-
-    im0 = axs[0].imshow(
-      model1, aspect='auto', cmap="Greys", 
-      vmin=vmin1, vmax=vmax1
-    )
-    axs[0].set_title(title1)
-    plt.colorbar(im0, ax=axs[0])
-
-    axs[0].plot(np.full(nz, trace_number), np.arange(nz), 'b--')
-
-    im1 = axs[1].imshow(
-      model2, aspect='auto', cmap="Greys", 
-      vmin=vmin2, vmax=vmax2
-    )
-    axs[1].set_title(title2)
-    plt.colorbar(im1, ax=axs[1])
-
-    axs[1].plot(np.full(nz, trace_number), np.arange(nz), 'r--')
-
-    axs[2].plot(model1[:, trace_number], np.arange(nz), label=f"{title1} Trace")
-    axs[2].plot(-model2[:, trace_number], np.arange(nz), 'r', label=f"{title2} Trace")
-
-    axs[2].invert_yaxis() 
-    axs[2].legend()
-
-    plt.tight_layout()
-    plt.show()
-
-  def compare_diff(
-    self, 
-    model1: np.ndarray, 
-    model2: np.ndarray, 
-    title1=None,
-    title2=None
-    ) -> None:
-
-    if title1 is None:
-      title1 = "Image 1"
-
-    if title2 is None:
-      title2 = "Image 2"
-
-    diff = model1 - model2
-    diff_norm = diff / np.max(np.abs(model1))
-
-    vmin = min(model1.min(), model2.min())
-    vmax = max(model1.max(), model2.max())
-
-    _, axs = plt.subplots(nrows=1, ncols=3, figsize=(15, 5))
-
-    im0 = axs[0].imshow(model1, aspect='auto', cmap="Greys", vmin=vmin, vmax=vmax)
-    axs[0].set_title(title1)
-    plt.colorbar(im0, ax=axs[0])
-
-    im1 = axs[1].imshow(model2, aspect='auto', cmap="Greys", vmin=vmin, vmax=vmax)
-    axs[1].set_title(title2)
-    plt.colorbar(im1, ax=axs[1])
-
-    im2 = axs[2].imshow(diff_norm, aspect='auto', cmap="Greys")
-    axs[2].set_title("Difference (%)")
-    plt.colorbar(im2, ax=axs[2])
-
-    rel_error = np.max(np.abs(diff)) / np.max(np.abs(diff_norm))
-    plt.suptitle(f"Relative Error: {rel_error * 100:.2f}%")
-
-    plt.tight_layout()
-    plt.show()
-
-pltm = Plotting()
-
-height = 2001
-weight = 21
-
-arr1 = pltm.load("dcalcx2001.bin", weight, height)
-arr2 = pltm.load("dobsx2001.bin", weight, height)
-
-pltm.compare_diff(arr1.T, arr2.T)
