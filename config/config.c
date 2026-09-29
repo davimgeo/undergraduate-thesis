@@ -20,8 +20,8 @@ SpecsContext* Specs_Init(SpecsContext* specs)
     {
       .line_length = 681,
 
-      .src_depth = 10,
-      .rec_depth = 0,
+      .src_depth = 0,
+      .rec_depth = 20,
 
       .offset_rec = 6,
       .offset_src = 15
@@ -35,7 +35,7 @@ SpecsContext* Specs_Init(SpecsContext* specs)
 
       .interfaces_size = 1,
 
-      .interfaces = {72},
+      .interfaces = {50},
       .values = {1500.0f, 2000.0f}
     },
 
@@ -48,8 +48,8 @@ SpecsContext* Specs_Init(SpecsContext* specs)
     .propagation =
     {
       .nt = 4001,
-      .dt = 1e-3f,
-      .dh = 10,
+      .dt = 1e-4f,
+      .dh = 2.5f,
 
       .factor = 0.0015f
     }

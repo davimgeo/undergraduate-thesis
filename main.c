@@ -10,17 +10,36 @@
 #include "config/config.h"
 #include "plot.h"
 
-#define NT 4001
-#define NREC 114
-#define NSHOT 46
-
 #define TOL 1e-6f
 #define C1 1e-4f
 
 #define MAX_ITERATIONS 20
 #define MAX_LINE_SEARCH 20
 
-float* get_nabla_gradient(float* vp, const float* dobs, SpecsContext* specs)
+typedef struct
+{
+  int nt;
+  int nrec;
+  int nshot;
+} data_shape_t;
+
+data_shape_t get_data_shape(SpecsContext* specs)
+{
+  geometry_t* geom = Geometry_InitCreate(NULL, &specs->geometry);
+  Geometry_Create(geom, 0);
+
+  data_shape_t shape;
+
+  shape.nt = specs->seismogram.nt;
+  shape.nrec = geom->nrec;
+  shape.nshot = geom->nsrc;
+
+  Geometry_Destroy(geom);
+
+  return shape;
+}
+
+float* get_nabla_gradient(float* vp, SpecsContext* specs)
 {
   size_t model_size = (size_t)specs->model.nz * specs->model.nx;
 
@@ -44,9 +63,9 @@ float* get_nabla_gradient(float* vp, const float* dobs, SpecsContext* specs)
   );
 
   rtm_t* rtm = RTM_Init(NULL, prop);
-  RTMv2_Run(rtm, dobs);
+  RTMv2_Run(rtm, "data/FWI/dobs/");
 
-  plot_image(rtm, model, 10);
+  //plot_image(rtm, model, 10);
 
   float* nabla_chi = malloc(model_size * sizeof(float));
 
@@ -75,12 +94,12 @@ float* get_nabla_gradient(float* vp, const float* dobs, SpecsContext* specs)
   return nabla_chi;
 }
 
-float* get_dcalc(float* vp, SpecsContext* specs)
+float* get_dcalc(float* vp, SpecsContext* specs, data_shape_t shape)
 {
   printf("Started Dcalc\n");
 
-  size_t shot_size = (size_t)NT * NREC;
-  size_t data_size = (size_t)NSHOT * shot_size;
+  size_t shot_size = (size_t)shape.nt * shape.nrec;
+  size_t data_size = (size_t)shape.nshot * shot_size;
 
   float* dcalc = malloc(data_size * sizeof(float));
 
@@ -91,10 +110,11 @@ float* get_dcalc(float* vp, SpecsContext* specs)
   Model_Set(model, vp);
   Model_Extent(model);
 
-  for (int ishot = 0; ishot < NSHOT; ++ishot)
+  for (int ishot = 0; ishot < shape.nshot; ++ishot)
   {
     geometry_t* geom = Geometry_InitCreate(NULL, &specs->geometry);
     Geometry_Create(geom, GEOMETRY_ONLY_RECEIVERS);
+
     Geometry_SetSource(
       geom,
       ishot * specs->geometry.offset_src,
@@ -127,41 +147,57 @@ float* get_dcalc(float* vp, SpecsContext* specs)
   Wavelet_Destroy(wave);
 
   printf("Finished Dcalc\n");
+
   return dcalc;
 }
 
 double l2_norm(
   const float* dcalc,
-  const float* dobs,
   int nt,
   int nrec,
-  int nshot
+  int nshot,
+  float dt
 )
 {
   double result = 0.0;
 
-  for(int ishot = 0; ishot < nshot; ++ishot)
+  size_t shot_size = (size_t)nt * nrec;
+
+  for (int ishot = 0; ishot < nshot; ++ishot)
   {
     // get specific shot from dobs/dcalc
-    const float* u_s = dcalc + ishot * nt * nrec;
-    const float* u_o = dobs + ishot * nt * nrec;
-    //plot2d(u_o, nt, nrec);
+    const float* u_s = dcalc + (size_t)ishot * shot_size;
+
+    char PATH[256];
+    snprintf(
+      PATH,
+      sizeof(PATH),
+      "%s/seismogram_%dx%d_shot%d.bin",
+      "data/FWI/dobs/",
+      nt,
+      nrec,
+      ishot
+    );
+
+    float* u_o = read2d(PATH, nt, nrec);
+    //compare_diff(u_s, u_o, nt, nrec, "u_s", "u_o");
 
     for (int irec = 0; irec < nrec; ++irec)
     {
       for (int t = 0; t < nt; ++t)
       {
-        int idx = t * nrec + irec;
+        size_t idx = (size_t)t * nrec + irec;
 
         double r = (double)u_s[idx] - (double)u_o[idx];
-        //printf("%g\n", u_o[idx]);
 
         result += r * r;
       }
     }
+
+    free(u_o);
   }
 
-  return 0.5f * result;
+  return 0.5f * result * (double)dt;
 }
 
 float gradient_scale(const float* gradient, size_t size)
@@ -172,7 +208,8 @@ float gradient_scale(const float* gradient, size_t size)
   {
     float g = fabsf(gradient[i]);
 
-    if (g > scale) scale = g;
+    if (g > scale)
+      scale = g;
   }
 
   return scale;
@@ -189,7 +226,13 @@ void save_current(float* m_current, SpecsContext* specs, int it)
     it + 1
   );
 
-  write2d(filename, m_current, sizeof(float), 141, 681);
+  write2d(
+    filename,
+    m_current,
+    sizeof(float),
+    specs->model.nz,
+    specs->model.nx
+  );
 }
 
 double get_GTP(const float* nabla_chi, size_t size)
@@ -213,8 +256,8 @@ void get_slowness_from_velocity(
   int nx
 )
 {
-  for(int i = 0; i < nz*nx; i++)
-    slowness[i] = 1.0f / (velocity[i]*velocity[i]);
+  for (int i = 0; i < nz * nx; i++)
+    slowness[i] = 1.0f / (velocity[i] * velocity[i]);
 }
 
 void get_velocity_from_slowness(
@@ -233,16 +276,16 @@ float get_initial_alpha(float* model, int row, int col)
   float max = model[0];
   float min = model[0];
 
-  for(int i = 0; i < row * col; i++)
+  for (int i = 0; i < row * col; i++)
   {
-    if(model[i] > max)
+    if (model[i] > max)
       max = model[i];
 
-    if(model[i] < min)
+    if (model[i] < min)
       min = model[i];
   }
 
-  return 0.02f * (max - min);
+  return 0.01f * (max - min);
 }
 
 int main()
@@ -251,25 +294,35 @@ int main()
 
   SpecsContext* specs = Specs_Init(NULL);
 
-  size_t model_size = (size_t)specs->model.nx * specs->model.nz;
+  int nx = specs->model.nx;
+  int nz = specs->model.nz;
 
-  float* m_real = read2d(
-    "data/FWI/marmousi_real_141x681x_dh25m.bin",
-    141,
-    681
-  );
-  //plot2d(m_real, 141, 681);
-  //float* m10 = read2d("data/FWI/m_10.bin", 141, 681);
+  data_shape_t shape = get_data_shape(specs);
 
-  float* dobs = read_any("data/FWI/dobs.bin", NT * NREC * NSHOT);
-  //float* dobs = get_dcalc(m_real, specs);
-  //write1d("data/dobs.bin", dobs, sizeof(float), NT * NREC * NSHOT);
+  int nt = shape.nt;
+  int nrec = shape.nrec;
+  int nshot = shape.nshot;
 
-  float* m0 = read2d("data/FWI/m0.bin", 141, 681);
-  float* dcalc_0 = read_any("data/FWI/dcalc_0.bin", NT * NREC * NSHOT);
-  //float* dcalc_0 = get_dcalc(m0, specs);
-  //write1d("data/dcalc_0.bin", dcalc_0, sizeof(float), NT * NREC * NSHOT);
-  double chi_m0 = l2_norm(dcalc_0, dobs, NT, NREC, NSHOT);
+  size_t model_size = (size_t)nx * nz;
+  size_t data_size = (size_t)nt * nrec * nshot;
+
+  printf("nt: %d\n", nt);
+  printf("nrec: %d\n", nrec);
+  printf("nshot: %d\n", nshot);
+
+  float* m_real = read2d("data/FWI/marmousi_real_141x681x_dh25m.bin", nz, nx);
+  //plot2d(m_real, nz, nx);
+
+  float* m0 = read2d("data/FWI/m0.bin", nz, nx);
+  //float* m3 = read2d("data/FWI/m_3.bin", nz, nx);
+  //compare_diff(m0, m3, nz, nx, "m0", "m3"); 
+  //plot2d(m3, nz, nx);
+
+  float* dcalc_0 = read_any("data/FWI/dcalc_0.bin", data_size);
+  //float* dcalc_0 = get_dcalc(m0, specs, shape);
+  //write1d("data/FWI/dcalc_0.bin", dcalc_0, sizeof(float), data_size);
+
+  double chi_m0 = l2_norm(dcalc_0, nt, nrec, nshot, 1e-4f);
 
   float* vp_current = malloc(model_size * sizeof(float));
   float* vp_k1 = malloc(model_size * sizeof(float));
@@ -278,7 +331,7 @@ int main()
   float* mk1 = malloc(model_size * sizeof(float));
 
   memcpy(vp_current, m0, model_size * sizeof(float));
-  get_slowness_from_velocity(vp_current, m_current, 141, 681);
+  get_slowness_from_velocity(vp_current, m_current, nz, nx);
 
   for (int it = 0; it < MAX_ITERATIONS; it++)
   {
@@ -289,21 +342,23 @@ int main()
 
     // dcalc = G(m_k)
     float* dcalc_current;
-    if(it == 0)
+
+    if (it == 0)
       dcalc_current = dcalc_0;
     else
-      dcalc_current = get_dcalc(vp_current, specs);
+      dcalc_current = get_dcalc(vp_current, specs, shape);
 
     // chi(m_k)
-    double chi_mk = l2_norm(dcalc_current, dobs, NT, NREC, NSHOT);
+    double chi_mk = l2_norm(dcalc_current, nt, nrec, nshot, 1e-4f);
 
     // nabla chi(m_k)
     //float* nabla_chi;
     //if(it == 0)
-    //  nabla_chi = read2d("nabla_chi_141x681.bin", 141, 681);
+    //  nabla_chi = read2d("data/FWI/nabla_chi_141x681.bin", nz, nx);
     //else
-    //  nabla_chi = get_nabla_gradient(vp_current, dobs, specs);
-    float *nabla_chi = get_nabla_gradient(vp_current, dobs, specs);
+    //  nabla_chi = get_nabla_gradient(vp_current, specs);
+    float* nabla_chi = get_nabla_gradient(vp_current, specs);
+    write2d("data/FWI/nabla_chi_141x681.bin", nabla_chi, sizeof(float), nz, nx);
 
     // normalized descent direction
     float grad_scale = gradient_scale(nabla_chi, model_size);
@@ -311,8 +366,11 @@ int main()
     for (size_t i = 0; i < model_size; i++)
       nabla_chi[i] /= grad_scale;
 
+    plot2d(nabla_chi, nz, nx);
+    
     double gTp = (double)grad_scale * get_GTP(nabla_chi, model_size);
-    float a_k = get_initial_alpha(mk, 141, 681);
+    float a_k = get_initial_alpha(mk, nz, nx);
+
     printf("alpha_0: %g\n", a_k);
 
     int accepted = 0;
@@ -321,27 +379,28 @@ int main()
     for (int ils = 0; ils < MAX_LINE_SEARCH; ++ils)
     {
       for (size_t i = 0; i < model_size; ++i)
-      {
-        mk1[i] = mk[i] - a_k * nabla_chi[i];
-      }
+        // changed - -> + just for the test
+        mk1[i] = mk[i] + a_k * nabla_chi[i];
 
-      get_velocity_from_slowness(mk1, vp_k1, 141, 681);
+      get_velocity_from_slowness(mk1, vp_k1, nz, nx);
+      compare_diff(m0, vp_k1, nz, nx, "m0", "vp_k1");
 
-      float* dcalc_1 = get_dcalc(vp_k1, specs);
+      float* dcalc_1 = get_dcalc(vp_k1, specs, shape);
 
       // chi(m_{k+1})
-      double chi_mk1 = l2_norm(dcalc_1, dobs, NT, NREC, NSHOT);
+      double chi_mk1 = l2_norm(dcalc_1, nt, nrec, nshot, 1e-4f);
       double armijo_rhs = chi_mk + C1 * (double)a_k * gTp;
 
       printf("chi_mk1: %.15g\n", chi_mk1);
       printf("armijo: %.15g\n", armijo_rhs);
 
       int armijo = chi_mk1 <= armijo_rhs;
+
       if (armijo)
       {
         printf("ACCEPTED\n");
 
-        compare_diff(vp_current, vp_k1, 141, 681, "vp_current", "vp_k1");
+        compare_diff(vp_current, vp_k1, nz, nx, "vp_current", "vp_k1");
 
         float* temp = m_current;
         m_current = mk1;
@@ -364,7 +423,9 @@ int main()
     }
 
     free(nabla_chi);
-    free(dcalc_current);
+
+    if (it != 0)
+      free(dcalc_current);
 
     if (!accepted)
     {
@@ -374,7 +435,6 @@ int main()
     }
 
     save_current(vp_current, specs, it);
-    //plot2d(m_current, 351, 881);
 
     if ((chi_mk / chi_m0) <= TOL)
     {
@@ -390,7 +450,7 @@ int main()
   free(m_current);
   free(dcalc_0);
   free(m0);
-  free(dobs);
+  free(m_real);
   free(specs);
 
   PROFILE_END();
