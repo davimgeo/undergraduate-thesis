@@ -197,7 +197,7 @@ double l2_norm(
     free(u_o);
   }
 
-  return 0.5f * result * (double)dt;
+  return 0.5 * result * (double)dt;
 }
 
 float gradient_scale(const float* gradient, size_t size)
@@ -235,20 +235,6 @@ void save_current(float* m_current, SpecsContext* specs, int it)
   );
 }
 
-double get_GTP(const float* nabla_chi, size_t size)
-{
-  double gTp = 0.0;
-
-  for (size_t i = 0; i < size; i++)
-  {
-    double h_k = -(double)nabla_chi[i];
-
-    gTp += (double)nabla_chi[i] * h_k;
-  }
-
-  return gTp;
-}
-
 void get_slowness_from_velocity(
   const float* velocity,
   float* slowness,
@@ -269,6 +255,16 @@ void get_velocity_from_slowness(
 {
   for (int i = 0; i < nz * nx; i++)
     velocity[i] = 1.0f / sqrtf(slowness[i]);
+}
+
+double get_GTP(const float* nabla_chi, const float* direction, size_t size)
+{
+  double gTp = 0.0;
+
+  for (size_t i = 0; i < size; ++i)
+    gTp += (double)nabla_chi[i] * (double)direction[i];
+
+  return gTp;
 }
 
 float get_initial_alpha(float* model, int row, int col)
@@ -303,32 +299,39 @@ int main()
   int nrec = shape.nrec;
   int nshot = shape.nshot;
 
+  float dt = specs->propagation.dt;
+  float dh = specs->propagation.dh;
+
   size_t model_size = (size_t)nx * nz;
   size_t data_size = (size_t)nt * nrec * nshot;
 
   printf("nt: %d\n", nt);
   printf("nrec: %d\n", nrec);
   printf("nshot: %d\n", nshot);
+  printf("dt: %.15e\n", (double)dt);
+  printf("dh: %.15e\n", (double)dh);
 
   float* m_real = read2d("data/FWI/marmousi_real_141x681x_dh25m.bin", nz, nx);
   //plot2d(m_real, nz, nx);
 
   float* m0 = read2d("data/FWI/m0.bin", nz, nx);
-  //float* m3 = read2d("data/FWI/m_3.bin", nz, nx);
-  //compare_diff(m0, m3, nz, nx, "m0", "m3"); 
-  //plot2d(m3, nz, nx);
+  float* m17 = read2d("data/FWI/m_17.bin", nz, nx);
+  //compare_diff(m_real, m17, nz, nx, "m0", "m17");
+  plot2d(m17, nz, nx);
 
   float* dcalc_0 = read_any("data/FWI/dcalc_0.bin", data_size);
   //float* dcalc_0 = get_dcalc(m0, specs, shape);
   //write1d("data/FWI/dcalc_0.bin", dcalc_0, sizeof(float), data_size);
 
-  double chi_m0 = l2_norm(dcalc_0, nt, nrec, nshot, 1e-4f);
+  double chi_m0 = l2_norm(dcalc_0, nt, nrec, nshot, dt);
 
   float* vp_current = malloc(model_size * sizeof(float));
   float* vp_k1 = malloc(model_size * sizeof(float));
 
   float* m_current = malloc(model_size * sizeof(float));
   float* mk1 = malloc(model_size * sizeof(float));
+
+  float* direction = malloc(model_size * sizeof(float));
 
   memcpy(vp_current, m0, model_size * sizeof(float));
   get_slowness_from_velocity(vp_current, m_current, nz, nx);
@@ -349,29 +352,28 @@ int main()
       dcalc_current = get_dcalc(vp_current, specs, shape);
 
     // chi(m_k)
-    double chi_mk = l2_norm(dcalc_current, nt, nrec, nshot, 1e-4f);
+    double chi_mk = l2_norm(dcalc_current, nt, nrec, nshot, dt);
 
     // nabla chi(m_k)
-    //float* nabla_chi;
-    //if(it == 0)
-    //  nabla_chi = read2d("data/FWI/nabla_chi_141x681.bin", nz, nx);
-    //else
-    //  nabla_chi = get_nabla_gradient(vp_current, specs);
-    float* nabla_chi = get_nabla_gradient(vp_current, specs);
-    write2d("data/FWI/nabla_chi_141x681.bin", nabla_chi, sizeof(float), nz, nx);
+    float* nabla_chi;
+
+    if (it == 0)
+      nabla_chi = read2d("data/FWI/nabla_chi_141x681.bin", nz, nx);
+    else
+      nabla_chi = get_nabla_gradient(vp_current, specs);
+
+    //float* nabla_chi = get_nabla_gradient(vp_current, specs);
+    //write2d("data/FWI/nabla_chi_141x681.bin", nabla_chi, sizeof(float), nz, nx);
 
     // normalized descent direction
     float grad_scale = gradient_scale(nabla_chi, model_size);
 
-    for (size_t i = 0; i < model_size; i++)
-      nabla_chi[i] /= grad_scale;
+    for (size_t i = 0; i < model_size; ++i)
+      direction[i] = -nabla_chi[i] / grad_scale;
 
-    plot2d(nabla_chi, nz, nx);
-    
-    double gTp = (double)grad_scale * get_GTP(nabla_chi, model_size);
+    double gTp = get_GTP(nabla_chi, direction, model_size);
+
     float a_k = get_initial_alpha(mk, nz, nx);
-
-    printf("alpha_0: %g\n", a_k);
 
     int accepted = 0;
 
@@ -379,20 +381,17 @@ int main()
     for (int ils = 0; ils < MAX_LINE_SEARCH; ++ils)
     {
       for (size_t i = 0; i < model_size; ++i)
-        // changed - -> + just for the test
-        mk1[i] = mk[i] + a_k * nabla_chi[i];
+        mk1[i] = mk[i] + a_k * direction[i];
 
       get_velocity_from_slowness(mk1, vp_k1, nz, nx);
-      compare_diff(m0, vp_k1, nz, nx, "m0", "vp_k1");
+      //compare_diff(m0, vp_k1, nz, nx, "m0", "vp_k1");
 
       float* dcalc_1 = get_dcalc(vp_k1, specs, shape);
 
       // chi(m_{k+1})
-      double chi_mk1 = l2_norm(dcalc_1, nt, nrec, nshot, 1e-4f);
-      double armijo_rhs = chi_mk + C1 * (double)a_k * gTp;
+      double chi_mk1 = l2_norm(dcalc_1, nt, nrec, nshot, dt);
 
-      printf("chi_mk1: %.15g\n", chi_mk1);
-      printf("armijo: %.15g\n", armijo_rhs);
+      double armijo_rhs = chi_mk + C1 * (double)a_k * gTp;
 
       int armijo = chi_mk1 <= armijo_rhs;
 
@@ -444,6 +443,7 @@ int main()
     }
   }
 
+  free(direction);
   free(vp_k1);
   free(vp_current);
   free(mk1);
@@ -457,3 +457,5 @@ int main()
 
   return 0;
 }
+
+
