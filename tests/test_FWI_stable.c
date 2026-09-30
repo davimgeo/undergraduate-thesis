@@ -281,7 +281,7 @@ float get_initial_alpha(float* model, int row, int col)
       min = model[i];
   }
 
-  return 0.20f * (max - min);
+  return 0.01f * (max - min);
 }
 
 int main()
@@ -315,9 +315,9 @@ int main()
   //plot2d(m_real, nz, nx);
 
   float* m0 = read2d("data/FWI/m0.bin", nz, nx);
-  float* m7 = read2d("data/FWI/m_7.bin", nz, nx);
-  compare_diff(m_real, m7, nz, nx, "m0", "m7");
-  plot2d(m7, nz, nx);
+  float* m17 = read2d("data/FWI/m_17.bin", nz, nx);
+  //compare_diff(m_real, m17, nz, nx, "m0", "m17");
+  plot2d(m17, nz, nx);
 
   float* dcalc_0 = read_any("data/FWI/dcalc_0.bin", data_size);
   //float* dcalc_0 = get_dcalc(m0, specs, shape);
@@ -329,7 +329,6 @@ int main()
   float* vp_k1 = malloc(model_size * sizeof(float));
 
   float* m_current = malloc(model_size * sizeof(float));
-  float* m_past = malloc(model_size * sizeof(float));
   float* mk1 = malloc(model_size * sizeof(float));
 
   float* direction = malloc(model_size * sizeof(float));
@@ -337,13 +336,12 @@ int main()
   memcpy(vp_current, m0, model_size * sizeof(float));
   get_slowness_from_velocity(vp_current, m_current, nz, nx);
 
-  for (int it = 7; it < MAX_ITERATIONS; it++)
+  for (int it = 0; it < MAX_ITERATIONS; it++)
   {
     printf("\nIteration %d\n", it);
 
     // mk = m_current
     float* mk = m_current;
-    float* mk_minus_1 = m_past;
 
     // dcalc = G(m_k)
     float* dcalc_current;
@@ -363,6 +361,7 @@ int main()
       nabla_chi = read2d("data/FWI/nabla_chi_141x681.bin", nz, nx);
     else
       nabla_chi = get_nabla_gradient(vp_current, specs);
+
     //float* nabla_chi = get_nabla_gradient(vp_current, specs);
     //write2d("data/FWI/nabla_chi_141x681.bin", nabla_chi, sizeof(float), nz, nx);
 
@@ -376,9 +375,6 @@ int main()
 
     float a_k = get_initial_alpha(mk, nz, nx);
 
-    printf("alpha_0: %.15e\n", (double)a_k);
-    printf("chi_mk: %.15e\n", (double)chi_mk);
-
     int accepted = 0;
 
     // line search
@@ -388,7 +384,6 @@ int main()
         mk1[i] = mk[i] + a_k * direction[i];
 
       get_velocity_from_slowness(mk1, vp_k1, nz, nx);
-
       //compare_diff(m0, vp_k1, nz, nx, "m0", "vp_k1");
 
       float* dcalc_1 = get_dcalc(vp_k1, specs, shape);
@@ -398,10 +393,8 @@ int main()
 
       double armijo_rhs = chi_mk + C1 * (double)a_k * gTp;
 
-      printf("chi_mk1: %.15e\n", (double)chi_mk);
-      printf("armijo: %.15e\n", (double)armijo_rhs);
-
       int armijo = chi_mk1 <= armijo_rhs;
+
       if (armijo)
       {
         printf("ACCEPTED\n");
@@ -464,5 +457,6 @@ int main()
 
   return 0;
 }
+
 
 

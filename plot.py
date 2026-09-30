@@ -14,7 +14,7 @@ nrec = 114
 nsrc = 46
 
 marmousi_real = load("data/FWI/marmousi_real_141x681x_dh25m.bin", nz, nx)
-marmousi_inverted = load("data/FWI/m_17.bin", nz, nx)
+marmousi_inverted = load("data/FWI/m_7.bin", nz, nx)
 marmousi_initial = load("data/FWI/m0.bin", nz, nx)
 
 trace = 340
